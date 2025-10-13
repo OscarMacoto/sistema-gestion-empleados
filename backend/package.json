@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "update": "git add . && git commit -m \"Actualización automática\" && git push origin main"
   },
   "keywords": [],
   "author": "",
