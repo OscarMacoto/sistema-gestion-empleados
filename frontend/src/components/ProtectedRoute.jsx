@@ -1,13 +1,15 @@
-import { useIsAuthenticated } from "@azure/msal-react"; 
-import { Navigate } from "react-router-dom"; 
-  
-function ProtectedRoute({ children }) { 
-  const isAuthenticated = useIsAuthenticated(); 
-  
-  if (!isAuthenticated) { 
-    return <Navigate to="/" replace />; 
-  } 
+//import React from "react";
+import { Navigate } from "react-router-dom";
+import { useIsAuthenticated } from "@azure/msal-react";
 
-  return children; 
-} 
-export default ProtectedRoute; 
+const ProtectedRoute = ({ children }) => {
+  const isAuthenticated = useIsAuthenticated();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+};
+
+export default ProtectedRoute;

@@ -10,6 +10,7 @@ import Estados from "./pages/Estados";
 import SSO from "./pages/SSO";
 import LoginMicrosoft from "./components/LoginMicrosoft";
 import SelfService from "./pages/SelfService";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const msalConfig = {
   auth: {
@@ -27,7 +28,9 @@ function AppContent() {
 
   const handleLogout = () => {
     instance.logoutPopup({
+      account: instance.getActiveAccount(),
       postLogoutRedirectUri: window.location.origin,
+      logoutHint: undefined,
     });
   };
 
@@ -49,28 +52,47 @@ function AppContent() {
       <Sidebar />
       <main className="flex-1 p-6 bg-gray-50">
         <Header title="Sistema de Gestión" />
+
         <button
           onClick={handleLogout}
           className="mb-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
         >
           Cerrar sesión
         </button>
+
         <Routes>
           <Route
-  path="/selfservice"
-  element={
-    isAuthenticated ? (
-      <SelfService />
-    ) : (
-      <div className="text-center mt-10 text-gray-600">
-        Debes iniciar sesión con Microsoft de ELEOS.
-      </div>
-    )
-  }
-/>
-          <Route path="/" element={<Empleados />} />
-          <Route path="/clinicas" element={<Clinicas />} />
-          <Route path="/estados" element={<Estados />} />
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Empleados />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clinicas"
+            element={
+              <ProtectedRoute>
+                <Clinicas />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estados"
+            element={
+              <ProtectedRoute>
+                <Estados />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/selfservice"
+            element={
+              <ProtectedRoute>
+                <SelfService />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/sso" element={<SSO />} />
         </Routes>
       </main>
@@ -79,7 +101,6 @@ function AppContent() {
 }
 
 function App() {
-  const isAuthenticated = useIsAuthenticated();
   return (
     <MsalProvider instance={msalInstance}>
       <Router>

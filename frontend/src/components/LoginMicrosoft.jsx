@@ -1,33 +1,77 @@
 import { useMsal } from "@azure/msal-react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 function LoginMicrosoft() {
   const { instance, accounts } = useMsal();
+  const navigate = useNavigate();
 
-  const handleLogin = () => {
-    instance.loginPopup().catch((e) => console.error(e));
+  useEffect(() => {
+    if (accounts.length > 0) {
+      navigate("/selfservice");
+    }
+  }, [accounts, navigate]);
+
+  const handleLogin = async () => {
+    try {
+      await instance.loginPopup({
+        scopes: ["user.read", "email", "openid", "profile"],
+        prompt: "select_account",
+      });
+      navigate("/selfservice");
+    } catch (error) {
+      console.error("Error en login:", error);
+    }
   };
 
-  const handleLogout = () => {
-    instance.logoutPopup().catch((e) => console.error(e));
+  const handleLogout = async () => {
+    try {
+      const activeAccount = instance.getActiveAccount();
+      await instance.logoutPopup({
+        account: activeAccount,
+        postLogoutRedirectUri: "/",
+        mainWindowRedirectUri: "/",
+      });
+    } catch (error) {
+      console.error("Error en logout:", error);
+    }
   };
 
   return (
-    <div className="text-center mt-6">
-      {accounts.length > 0 ? (
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 text-white px-4 py-2 rounded"
-        >
-          Cerrar sesión
-        </button>
-      ) : (
-        <button
-          onClick={handleLogin}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Iniciar sesión con Microsoft
-        </button>
-      )}
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
+      <div className="bg-white shadow-md rounded-xl p-5 text-center max-w-md w-full">
+        <h1 className="text-2xl font-bold text-gray-700 mb-6">
+          Sistema de Gestión de Empleados
+        </h1>
+
+        {accounts.length === 0 ? (
+          <>
+            <p className="text-gray-600 mb-4">
+              Inicia sesión con tu correo de ELEOS
+            </p>
+            <button
+              onClick={handleLogin}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+            >
+              Log In
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-gray-600 mb-4">
+              Sesión activa como:
+              <br />
+              <strong>{accounts[0].username}</strong>
+            </p>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition"
+            >
+              Log Out
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
