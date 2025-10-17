@@ -14,10 +14,31 @@ function LoginMicrosoft() {
 
   const handleLogin = async () => {
     try {
-      await instance.loginPopup({
+      const response = await instance.loginPopup({
         scopes: ["user.read", "email", "openid", "profile"],
         prompt: "select_account",
       });
+
+      const account = response.account;
+      const email = account.username;
+
+      const empleadoResponse = await fetch(
+        `http://localhost:5000/api/empleados/email/${email}`
+      );
+      const empleadoData = await empleadoResponse.json();
+
+      if (empleadoData?.id_empleado) {
+        await fetch("http://localhost:5000/api/sso/actualizar-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id_empleado: empleadoData.id_empleado }),
+        });
+
+        console.log("✅ L_login actualizado para:", email);
+      } else {
+        console.warn("⚠️ No se encontró empleado con el correo:", email);
+      }
+
       navigate("/selfservice");
     } catch (error) {
       console.error("Error en login:", error);
@@ -43,7 +64,6 @@ function LoginMicrosoft() {
         <h1 className="text-2xl font-bold text-gray-700 mb-6">
           Sistema de Gestión de Empleados
         </h1>
-
         {accounts.length === 0 ? (
           <>
             <p className="text-gray-600 mb-4">

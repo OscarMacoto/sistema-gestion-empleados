@@ -10,7 +10,6 @@ import Estados from "./pages/Estados";
 import SSO from "./pages/SSO";
 import LoginMicrosoft from "./components/LoginMicrosoft";
 import SelfService from "./pages/SelfService";
-import ProtectedRoute from "./components/ProtectedRoute";
 
 const msalConfig = {
   auth: {
@@ -27,11 +26,7 @@ function AppContent() {
   const { instance } = useMsal();
 
   const handleLogout = () => {
-    instance.logoutPopup({
-      account: instance.getActiveAccount(),
-      postLogoutRedirectUri: window.location.origin,
-      logoutHint: undefined,
-    });
+    instance.logoutPopup({ postLogoutRedirectUri: window.location.origin });
   };
 
   if (!isAuthenticated) {
@@ -52,47 +47,17 @@ function AppContent() {
       <Sidebar />
       <main className="flex-1 p-6 bg-gray-50">
         <Header title="Sistema de Gestión" />
-
         <button
           onClick={handleLogout}
           className="mb-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
         >
           Cerrar sesión
         </button>
-
         <Routes>
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Empleados />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/clinicas"
-            element={
-              <ProtectedRoute>
-                <Clinicas />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/estados"
-            element={
-              <ProtectedRoute>
-                <Estados />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/selfservice"
-            element={
-              <ProtectedRoute>
-                <SelfService />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/selfservice" element={<SelfService />} />
+          <Route path="/" element={<Empleados />} />
+          <Route path="/clinicas" element={<Clinicas />} />
+          <Route path="/estados" element={<Estados />} />
           <Route path="/sso" element={<SSO />} />
         </Routes>
       </main>
