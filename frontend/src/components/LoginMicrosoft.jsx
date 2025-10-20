@@ -34,9 +34,9 @@ function LoginMicrosoft() {
           body: JSON.stringify({ id_empleado: empleadoData.id_empleado }),
         });
 
-        console.log("✅ L_login actualizado para:", email);
+        console.log("L_login actualizado para:", email);
       } else {
-        console.warn("⚠️ No se encontró empleado con el correo:", email);
+        console.warn("No se encontró empleado con el correo:", email);
       }
 
       navigate("/selfservice");
