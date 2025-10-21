@@ -1,92 +1,193 @@
-import { useEffect, useState } from "react"; 
-  
-function Empleados() { 
-  const [empleados, setEmpleados] = useState([]); 
-  const [busqueda, setBusqueda] = useState(""); 
-  const [pagina, setPagina] = useState(1); 
-  const porPagina = 6; 
-  
-  useEffect(() => { 
-    fetch("http://localhost:5000/api/empleados") 
-      .then(res => res.json()) 
-      .then(data => setEmpleados(data)) 
-      .catch(() => console.error("No se pudieron cargar los empleados")); 
-  }, []); 
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 
-  const filtrados = empleados.filter(e => 
-    e.nombre?.toLowerCase().includes(busqueda.toLowerCase()) || 
-    e.DNI?.toLowerCase().includes(busqueda.toLowerCase()) 
-  ); 
-  
-  const totalPaginas = Math.ceil(filtrados.length / porPagina); 
-  const inicio = (pagina - 1) * porPagina; 
-  const fin = inicio + porPagina;  
-  const formatFecha = fecha => 
-    fecha ? new Date(fecha).toISOString().split("T")[0] : ""; 
-  
-  return ( 
-    <div className="p-6 bg-white rounded-2xl shadow-md"> 
-      <h2 className="text-2xl font-bold mb-4 text-center">Empleados</h2> 
-      <input 
-        type="text" 
-        placeholder="Buscar por nombre o DNI..." 
-        value={busqueda} 
-        onChange={e => setBusqueda(e.target.value)} 
-        className="border p-2 mb-4 w-full rounded-lg" 
-      /> 
-  
-      <table className="min-w-full border border-gray-300 rounded-lg text-center"> 
-        <thead className="bg-blue-600 text-white"> 
-          <tr> 
-            <th className="py-2 px-4">ID</th> 
-            <th className="py-2 px-4">Nombre</th> 
-            <th className="py-2 px-4">DNI</th> 
-            <th className="py-2 px-4">Correo</th> 
-            <th className="py-2 px-4">Fecha Ingreso</th> 
-            <th className="py-2 px-4">Teléfono</th> 
-            <th className="py-2 px-4">Dirección</th> 
-            <th className="py-2 px-4">Clínica</th> 
-            <th className="py-2 px-4">Estado</th> 
-          </tr> 
-        </thead> 
-        <tbody> 
-          {filtrados.slice(inicio, fin).map(e => ( 
-            <tr key={e.id_empleado} className="border-b hover:bg-gray-100"> 
-              <td className="py-2">{e.id_empleado}</td> 
-              <td className="py-2">{e.nombre}</td> 
-              <td className="py-2">{e.DNI}</td> 
-              <td className="py-2">{e.correo}</td> 
-              <td className="py-2">{formatFecha(e.fecha_ingreso)}</td> 
-              <td className="py-2">{e.telefono}</td> 
-              <td className="py-2">{e.direccion}</td> 
-              <td className="py-2">{e.clinica}</td> 
-              <td className="py-2">{e.estado}</td> 
-            </tr> 
-          ))} 
-        </tbody> 
-      </table> 
- 
-      <div className="flex justify-center items-center mt-4 gap-2"> 
-        <button 
-          onClick={() => setPagina(pagina - 1)} 
-          disabled={pagina === 1} 
-          className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50" 
-        > 
-          ⬅️ 
-        </button> 
-        <span> 
-          Página {pagina} de {totalPaginas} 
-        </span> 
-        <button 
-          onClick={() => setPagina(pagina + 1)} 
-          disabled={pagina === totalPaginas} 
-          className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50" 
-        > 
-          ➡️ 
-        </button> 
-      </div> 
-    </div> 
-  ); 
-} 
- 
-export default Empleados; 
+const Empleado = () => {
+  const [empleados, setEmpleados] = useState([]);
+  const [nuevoEmpleado, setNuevoEmpleado] = useState({
+    nombre: "",
+    DNI: "",
+    correo: "",
+    telefono: "",
+    direccion: "",
+    id_estado: "",
+    id_clinica: "",
+  });
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [estados, setEstados] = useState([]);
+  const [clinicas, setClinicas] = useState([]);
+
+  useEffect(() => {
+    obtenerEmpleados();
+    obtenerEstados();
+    obtenerClinicas();
+  }, []);
+
+  const obtenerEmpleados = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/empleados");
+      setEmpleados(Array.isArray(res.data) ? res.data : []);
+    } catch (error) {
+      console.error("Error al obtener empleados:", error);
+      setEmpleados([]);
+    }
+  };
+
+  const obtenerEstados = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/empleados/estados/lista");
+      setEstados(res.data);
+    } catch (error) {
+      console.error("Error al obtener estados:", error);
+    }
+  };
+
+  const obtenerClinicas = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/empleados/clinicas/lista");
+      setClinicas(res.data);
+    } catch (error) {
+      console.error("Error al obtener clínicas:", error);
+    }
+  };
+
+  const handleChange = (e) => {
+    setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: e.target.value });
+  };
+
+  const agregarEmpleado = async () => {
+    try {
+      await axios.post("http://localhost:5000/api/empleados", nuevoEmpleado);
+      alert("Empleado agregado correctamente");
+      setNuevoEmpleado({
+        nombre: "",
+        DNI: "",
+        correo: "",
+        telefono: "",
+        direccion: "",
+        id_estado: "",
+        id_clinica: "",
+      });
+      obtenerEmpleados();
+      setMostrarFormulario(false);
+    } catch (error) {
+      alert("Error al agregar empleado: " + error.response?.data?.error);
+      console.error(error);
+    }
+  };
+
+  const eliminarEmpleado = async (id) => {
+    if (window.confirm("¿Seguro que deseas eliminar este empleado?")) {
+      try {
+        await axios.delete(`http://localhost:5000/api/empleados/${id}`);
+        obtenerEmpleados();
+      } catch (error) {
+        alert("Error al eliminar empleado");
+        console.error(error);
+      }
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-center mb-6">Gestión de Empleados</h2>
+
+      <div className="flex justify-left mb-4">
+        <button
+          onClick={() => setMostrarFormulario(!mostrarFormulario)}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          {mostrarFormulario ? "Cancelar" : "Agregar empleado"}
+        </button>
+      </div>
+
+      {mostrarFormulario && (
+        <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-6">
+          <div className="grid grid-cols-2 gap-4">
+            <input name="nombre" placeholder="Nombre" value={nuevoEmpleado.nombre} onChange={handleChange} className="p-2 border rounded" />
+            <input name="DNI" placeholder="DNI" value={nuevoEmpleado.DNI} onChange={handleChange} className="p-2 border rounded" />
+            <input name="correo" placeholder="Correo" value={nuevoEmpleado.correo} onChange={handleChange} className="p-2 border rounded" />
+            <input name="telefono" placeholder="Teléfono" value={nuevoEmpleado.telefono} onChange={handleChange} className="p-2 border rounded" />
+            <input name="direccion" placeholder="Dirección" value={nuevoEmpleado.direccion} onChange={handleChange} className="p-2 border rounded" />
+
+            <select name="id_estado" value={nuevoEmpleado.id_estado} onChange={handleChange} className="p-2 border rounded">
+              <option value="">Seleccionar estado...</option>
+              {estados.map((estado) => (
+                <option key={estado.id_estado} value={estado.id_estado}>
+                  {estado.descripcion}
+                </option>
+              ))}
+            </select>
+
+            <select name="id_clinica" value={nuevoEmpleado.id_clinica} onChange={handleChange} className="p-2 border rounded">
+              <option value="">Seleccionar clínica...</option>
+              {clinicas.map((clinica) => (
+                <option key={clinica.id_clinica} value={clinica.id_clinica}>
+                  {clinica.nombre_clinica}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={agregarEmpleado}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              Guardar empleado
+            </button>
+          </div>
+        </div>
+      )}
+
+      <table className="min-w-full bg-white border border-gray-200 shadow-md rounded-lg">
+        <thead>
+          <tr className="bg-blue-200">
+            <th className="py-2 px-4 border">ID</th>
+            <th className="py-2 px-4 border">Nombre</th>
+            <th className="py-2 px-4 border">DNI</th>
+            <th className="py-2 px-4 border">Correo</th>
+            <th className="py-2 px-4 border">Fecha ingreso</th>
+            <th className="py-2 px-4 border">Teléfono</th>
+            <th className="py-2 px-4 border">Dirección</th>
+            <th className="py-2 px-4 border">Estado</th>
+            <th className="py-2 px-4 border">Clínica</th>
+            <th className="py-2 px-4 border">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {empleados.length > 0 ? (
+            empleados.map((empleado) => (
+              <tr key={empleado.id_empleado} className="text-center border-b">
+                <td className="py-2 px-4">{empleado.id_empleado}</td>
+                <td className="py-2 px-4">{empleado.nombre}</td>
+                <td className="py-2 px-4">{empleado.DNI}</td>
+                <td className="py-2 px-4">{empleado.correo}</td>
+                <td className="py-2 px-4">{empleado.fecha_ingreso}</td>
+                <td className="py-2 px-4">{empleado.telefono}</td>
+                <td className="py-2 px-4">{empleado.direccion}</td>
+                <td className="py-2 px-4">{empleado.estado}</td>
+                <td className="py-2 px-4">{empleado.clinica}</td>
+                <td className="py-2 px-4">
+                  <button
+                    onClick={() => eliminarEmpleado(empleado.id_empleado)}
+                    className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="10" className="text-center py-3 text-gray-500">
+                No hay empleados registrados
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default Empleado;

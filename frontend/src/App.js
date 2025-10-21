@@ -54,11 +54,12 @@ function AppContent() {
           Cerrar sesión
         </button>
         <Routes>
-          <Route path="/selfservice" element={<SelfService />} />
+
           <Route path="/" element={<Empleados />} />
           <Route path="/clinicas" element={<Clinicas />} />
           <Route path="/estados" element={<Estados />} />
           <Route path="/sso" element={<SSO />} />
+          <Route path="/selfservice" element={<SelfService />} />
         </Routes>
       </main>
     </div>
