@@ -15,6 +15,8 @@ const Empleado = () => {
     id_estado: "",
     id_clinica: "",
   });
+
+  const [empleadoEditando, setEmpleadoEditando] = useState(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [estados, setEstados] = useState([]);
   const [clinicas, setClinicas] = useState([]);
@@ -53,7 +55,7 @@ const Empleado = () => {
     }
   };
 
-  const handleChange = (e) => {
+  const handleChangeNuevo = (e) => {
     setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: e.target.value });
   };
 
@@ -90,13 +92,65 @@ const Empleado = () => {
     }
   };
 
+const seleccionarEmpleado = (empleado) => {
+  setEmpleadoEditando({
+    id_empleado: empleado.id_empleado,
+    id_estado: "",
+    id_clinica: "",
+    estado_text: empleado.estado ?? "",
+    clinica_text: empleado.clinica ?? "",
+  });
+};
+
+useEffect(() => {
+  if (!empleadoEditando) return;
+  if (estados.length === 0 || clinicas.length === 0) return;
+
+  const estadoEncontrado = estados.find(
+    (e) =>
+      e.descripcion?.trim().toLowerCase() ===
+      empleadoEditando.estado_text?.trim().toLowerCase()
+  );
+
+  const clinicaEncontrada = clinicas.find(
+    (c) =>
+      c.nombre_clinica?.trim().toLowerCase() ===
+      empleadoEditando.clinica_text?.trim().toLowerCase()
+  );
+
+  setEmpleadoEditando((prev) => ({
+    ...prev,
+    id_estado: estadoEncontrado ? estadoEncontrado.id_estado : "",
+    id_clinica: clinicaEncontrada ? clinicaEncontrada.id_clinica : "",
+  }));
+}, [empleadoEditando?.estado_text, empleadoEditando?.clinica_text, estados, clinicas]);
+
+const actualizarEmpleado = async () => {
+  try {
+    await axios.put(
+      `http://localhost:5000/api/empleados/${empleadoEditando.id_empleado}`,
+      {
+        id_estado: empleadoEditando.id_estado,
+        id_clinica: empleadoEditando.id_clinica,
+      }
+    );
+    alert("Empleado actualizado correctamente");
+    setEmpleadoEditando(null);
+    obtenerEmpleados();
+  } catch (error) {
+    alert("Error al actualizar empleado");
+    console.error(error);
+  }
+};
+
+
   const indiceUltimo = paginaActual * empleadosPorPagina;
   const indicePrimero = indiceUltimo - empleadosPorPagina;
   const empleadosActuales = empleados.slice(indicePrimero, indiceUltimo);
   const totalPaginas = Math.ceil(empleados.length / empleadosPorPagina);
 
   return (
-    <div className="max-w-6xl mx-auto px-4">
+    <div>
       <h2 className="text-2xl font-bold text-center mb-6">Gestión de Empleados</h2>
 
       <div className="flex justify-left mb-4">
@@ -110,14 +164,14 @@ const Empleado = () => {
 
       {mostrarFormulario && (
         <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-6">
+          <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
           <div className="grid grid-cols-2 gap-4">
-            <input name="nombre" placeholder="Nombre" value={nuevoEmpleado.nombre} onChange={handleChange} className="p-2 border rounded text-sm" />
-            <input name="DNI" placeholder="DNI" value={nuevoEmpleado.DNI} onChange={handleChange} className="p-2 border rounded text-sm" />
-            <input name="correo" placeholder="Correo" value={nuevoEmpleado.correo} onChange={handleChange} className="p-2 border rounded text-sm" />
-            <input name="telefono" placeholder="Teléfono" value={nuevoEmpleado.telefono} onChange={handleChange} className="p-2 border rounded text-sm" />
-            <input name="direccion" placeholder="Dirección" value={nuevoEmpleado.direccion} onChange={handleChange} className="p-2 border rounded text-sm" />
-
-            <select name="id_estado" value={nuevoEmpleado.id_estado} onChange={handleChange} className="p-2 border rounded text-sm">
+            <input name="nombre" placeholder="Nombre" value={nuevoEmpleado.nombre} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
+            <input name="DNI" placeholder="DNI" value={nuevoEmpleado.DNI} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
+            <input name="correo" placeholder="Correo" value={nuevoEmpleado.correo} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
+            <input name="telefono" placeholder="Teléfono" value={nuevoEmpleado.telefono} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
+            <input name="direccion" placeholder="Dirección" value={nuevoEmpleado.direccion} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
+            <select name="id_estado" value={nuevoEmpleado.id_estado} onChange={handleChangeNuevo} className="p-2 border rounded text-sm">
               <option value="">Seleccionar estado...</option>
               {estados.map((estado) => (
                 <option key={estado.id_estado} value={estado.id_estado}>
@@ -125,8 +179,7 @@ const Empleado = () => {
                 </option>
               ))}
             </select>
-
-            <select name="id_clinica" value={nuevoEmpleado.id_clinica} onChange={handleChange} className="p-2 border rounded text-sm">
+            <select name="id_clinica" value={nuevoEmpleado.id_clinica} onChange={handleChangeNuevo} className="p-2 border rounded text-sm">
               <option value="">Seleccionar clínica...</option>
               {clinicas.map((clinica) => (
                 <option key={clinica.id_clinica} value={clinica.id_clinica}>
@@ -135,13 +188,41 @@ const Empleado = () => {
               ))}
             </select>
           </div>
-
           <div className="flex justify-center mt-4">
-            <button
-              onClick={agregarEmpleado}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
+            <button onClick={agregarEmpleado} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
               Guardar empleado
+            </button>
+          </div>
+        </div>
+      )}
+
+      {empleadoEditando && (
+        <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
+          <h3 className="text-lg font-semibold mb-2">Editar empleado #{empleadoEditando.id_empleado}</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <select name="id_estado" value={empleadoEditando.id_estado} onChange={(e) => setEmpleadoEditando({ ...empleadoEditando, id_estado: e.target.value })} className="p-2 border rounded text-sm">
+              <option value="">Seleccionar estado...</option>
+              {estados.map((estado) => (
+                <option key={estado.id_estado} value={estado.id_estado}>
+                  {estado.descripcion}
+                </option>
+              ))}
+            </select>
+            <select name="id_clinica" value={empleadoEditando.id_clinica} onChange={(e) => setEmpleadoEditando({ ...empleadoEditando, id_clinica: e.target.value })} className="p-2 border rounded text-sm">
+              <option value="">Seleccionar clínica...</option>
+              {clinicas.map((clinica) => (
+                <option key={clinica.id_clinica} value={clinica.id_clinica}>
+                  {clinica.nombre_clinica}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-center mt-4 gap-4">
+            <button onClick={actualizarEmpleado} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+              Guardar cambios
+            </button>
+            <button onClick={() => setEmpleadoEditando(null)} className="bg-red-400 text-white px-4 py-2 rounded hover:bg-gray-500">
+              Cancelar
             </button>
           </div>
         </div>
@@ -177,11 +258,11 @@ const Empleado = () => {
                   <td className="py-1 px-2">{empleado.estado}</td>
                   <td className="py-1 px-2">{empleado.clinica}</td>
                   <td className="py-1 px-2">
-                    <button
-                      onClick={() => eliminarEmpleado(empleado.id_empleado)}
-                      className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 text-sm"
-                    >
+                    <button onClick={() => eliminarEmpleado(empleado.id_empleado)} className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 text-sm">
                       Eliminar
+                    </button>
+                    <button onClick={() => seleccionarEmpleado(empleado)} className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm ml-2">
+                      Editar
                     </button>
                   </td>
                 </tr>
@@ -198,17 +279,15 @@ const Empleado = () => {
       </div>
 
       <div className="flex justify-center mt-4 space-x-2">
-        {Array.from({ length: totalPaginas }, (_, i) => {
-          return (
-            <button
-              key={i + 1}
-              onClick={() => setPaginaActual(i + 1)}
-              className={`px-3 py-1 rounded text-sm ${paginaActual === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-            >
-              {i + 1}
-            </button>
-          );
-        })}
+        {Array.from({ length: totalPaginas }, (_, i) => (
+          <button
+            key={i + 1}
+            onClick={() => setPaginaActual(i + 1)}
+            className={`px-3 py-1 rounded text-sm ${paginaActual === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+          >
+            {i + 1}
+          </button>
+        ))}
       </div>
     </div>
   );
