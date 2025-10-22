@@ -8,7 +8,7 @@ function LoginMicrosoft() {
 
   useEffect(() => {
     if (accounts.length > 0) {
-      navigate("/selfservice");
+      navigate("/Empleados");
     }
   }, [accounts, navigate]);
 
@@ -39,7 +39,7 @@ function LoginMicrosoft() {
         console.warn("No se encontró empleado con el correo:", email);
       }
 
-      navigate("/selfservice");
+      navigate("/Empleados");
     } catch (error) {
       console.error("Error en login:", error);
     }

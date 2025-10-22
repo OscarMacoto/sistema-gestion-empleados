@@ -6,12 +6,12 @@ const dbConfig = {
   server: "OSCAR-MACOTO-HN01",
   database: "RRHH",
   options: {
-    encrypt: true, 
+    encrypt: true,
     trustServerCertificate: true,
   },
 };
 
- async function connectDB() {
+async function connectDB() {
   try {
     const pool = await sql.connect(dbConfig);
     console.log("Conectado a la base de datos");
@@ -22,4 +22,4 @@ const dbConfig = {
   }
 }
 
-export { connectDB, sql };
+export { connectDB, sql };

@@ -9,6 +9,7 @@ import estadosRoutes from "./routes/estados.js";
 import ssoRoutes from "./routes/sso.js";
 
 const app = express();
+const PORT = 5000;
 
 app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json());
@@ -18,29 +19,18 @@ app.use("/api/clinicas", clinicasRoutes);
 app.use("/api/estados", estadosRoutes);
 app.use("/api/sso", ssoRoutes);
 
-const PORT = 5000;
-
 app.get("/api/empleados/email/:correo", async (req, res) => {
   try {
     const correo = req.params.correo;
-    console.log("Buscando empleado con correo:", correo);
-
     const pool = await connectDB();
     const result = await pool.request()
       .input("correo", sql.VarChar, correo)
       .query(`
-        SELECT 
-          e.id_empleado, 
-          e.nombre, 
-          e.DNI, 
-          e.correo, 
-          e.fecha_ingreso, 
-          e.telefono, 
-          c.nombre_clinica AS clinica, 
-          est.descripcion AS estado 
-        FROM Empleado e 
-        INNER JOIN Clinica c ON e.id_clinica = c.id_clinica 
-        INNER JOIN Estado_empleado est ON e.id_estado = est.id_estado 
+        SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.telefono,
+               c.nombre_clinica AS clinica, est.descripcion AS estado
+        FROM Empleado e
+        INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
+        INNER JOIN Estado_empleado est ON e.id_estado = est.id_estado
         WHERE e.correo = @correo
       `);
 
@@ -58,7 +48,6 @@ app.get("/api/empleados/email/:correo", async (req, res) => {
 app.post("/api/sso/actualizar-login", async (req, res) => {
   try {
     const { id_empleado } = req.body;
-
     if (!id_empleado) {
       return res.status(400).json({ error: "Falta el id_empleado" });
     }
@@ -72,7 +61,6 @@ app.post("/api/sso/actualizar-login", async (req, res) => {
         WHERE id_empleado = @id_empleado
       `);
 
-    console.log(`L_login actualizado para id_empleado: ${id_empleado}`);
     res.json({ success: true, message: "L_login actualizado correctamente" });
   } catch (err) {
     console.error("Error al actualizar L_login:", err);

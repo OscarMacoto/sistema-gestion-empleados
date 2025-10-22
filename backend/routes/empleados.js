@@ -3,25 +3,27 @@ import { connectDB } from "../db.js";
 
 const router = express.Router();
 
+const ejecutarConsulta = async (query) => {
+  const pool = await connectDB();
+  return await pool.request().query(query);
+};
+
+const validarCampos = (campos) => campos.every(c => Boolean(c));
+
 router.get("/", async (req, res) => {
   try {
-    const pool = await connectDB();
-    const result = await pool.request().query(`
-      SELECT 
-        e.id_empleado,
-        e.nombre,
-        e.DNI,
-        e.correo,
-        CONVERT(varchar(10), e.fecha_ingreso, 120) AS fecha_ingreso,
-        e.telefono,
-        e.direccion,
-        es.descripcion AS estado,
-        c.nombre_clinica AS clinica
+    const query = `
+      SELECT e.id_empleado, e.nombre, e.DNI, e.correo,
+             CONVERT(varchar(10), e.fecha_ingreso, 120) AS fecha_ingreso,
+             e.telefono, e.direccion,
+             es.descripcion AS estado,
+             c.nombre_clinica AS clinica
       FROM Empleado e
       INNER JOIN Estado_empleado es ON e.id_estado = es.id_estado
       INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
       ORDER BY e.id_empleado ASC
-    `);
+    `;
+    const result = await ejecutarConsulta(query);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error al obtener empleados:", err);
@@ -33,7 +35,7 @@ router.post("/", async (req, res) => {
   const { nombre, DNI, correo, telefono, direccion, id_estado, id_clinica } = req.body;
 
   try {
-    if (!nombre || !DNI || !correo || !telefono || !direccion || !id_estado || !id_clinica) {
+    if (!validarCampos([nombre, DNI, correo, telefono, direccion, id_estado, id_clinica])) {
       return res.status(400).json({ error: "Todos los campos son obligatorios." });
     }
 
@@ -65,20 +67,14 @@ router.put("/:id", async (req, res) => {
   const { nombre, DNI, correo, telefono, direccion, id_estado, id_clinica } = req.body;
 
   try {
-    const pool = await connectDB();
-
-    await pool.request().query(`
+    const query = `
       UPDATE Empleado
-      SET nombre='${nombre}',
-          DNI='${DNI}',
-          correo='${correo}',
-          telefono='${telefono}',
-          direccion='${direccion}',
-          id_estado=${id_estado},
-          id_clinica=${id_clinica}
+      SET nombre='${nombre}', DNI='${DNI}', correo='${correo}',
+          telefono='${telefono}', direccion='${direccion}',
+          id_estado=${id_estado}, id_clinica=${id_clinica}
       WHERE id_empleado=${id}
-    `);
-
+    `;
+    await ejecutarConsulta(query);
     res.json({ message: "Empleado actualizado correctamente." });
   } catch (err) {
     console.error("Error al actualizar empleado:", err);
@@ -86,23 +82,15 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
     const pool = await connectDB();
-
-    await pool.request().query(`
-      DELETE FROM Historial_clinica WHERE id_empleado = ${id}
-    `);
-
-    await pool.request().query(`
-      DELETE FROM CuentaSSO WHERE id_empleado = ${id}
-    `);
-
-    await pool.request().query(`
-      DELETE FROM Empleado WHERE id_empleado = ${id}
-    `);
+    await pool.request().query(`DELETE FROM Historial_clinica WHERE id_empleado = ${id}`);
+    await pool.request().query(`DELETE FROM CuentaSSO WHERE id_empleado = ${id}`);
+    await pool.request().query(`DELETE FROM Empleado WHERE id_empleado = ${id}`);
 
     res.json({ message: "Empleado y registros relacionados eliminados correctamente." });
   } catch (err) {
@@ -110,36 +98,5 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-router.get("/estados/lista", async (req, res) => {
-  try {
-    const pool = await connectDB();
-    const result = await pool.request().query(`
-      SELECT id_estado, descripcion 
-      FROM Estado_empleado 
-      ORDER BY descripcion ASC
-    `);
-    res.json(result.recordset);
-  } catch (err) {
-    console.error("Error al obtener lista de estados:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get("/clinicas/lista", async (req, res) => {
-  try {
-    const pool = await connectDB();
-    const result = await pool.request().query(`
-      SELECT id_clinica, nombre_clinica 
-      FROM Clinica 
-      ORDER BY nombre_clinica ASC
-    `);
-    res.json(result.recordset);
-  } catch (err) {
-    console.error("Error al obtener lista de clínicas:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 
 export default router;
