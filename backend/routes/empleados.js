@@ -42,18 +42,29 @@ router.post("/", async (req, res) => {
     const pool = await connectDB();
     const fechaIngreso = new Date().toISOString().split("T")[0];
 
-    const insertEmpleado = await pool.request().query(`
-      INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, fecha_ingreso)
-      OUTPUT INSERTED.id_empleado
-      VALUES ('${nombre}', '${DNI}', '${correo}', '${telefono}', '${direccion}', ${id_estado}, ${id_clinica}, '${fechaIngreso}')
-    `);
+    const insertEmpleado = await pool.request()
+      .input("nombre", nombre)
+      .input("DNI", DNI)
+      .input("correo", correo)
+      .input("telefono", telefono)
+      .input("direccion", direccion)
+      .input("id_estado", id_estado)
+      .input("id_clinica", id_clinica)
+      .input("fecha_ingreso", fechaIngreso)
+      .query(`
+        INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, fecha_ingreso)
+        OUTPUT INSERTED.id_empleado
+        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @fecha_ingreso)
+      `);
 
     const id_empleado = insertEmpleado.recordset[0].id_empleado;
 
-    await pool.request().query(`
-      INSERT INTO CuentaSSO (id_empleado, L_login)
-      VALUES (${id_empleado}, GETDATE())
-    `);
+    await pool.request()
+      .input("id_empleado", id_empleado)
+      .query(`
+        INSERT INTO CuentaSSO (id_empleado, L_login)
+        VALUES (@id_empleado, GETDATE())
+      `);
 
     res.json({ message: "Empleado y cuenta SSO agregados correctamente." });
   } catch (err) {
@@ -61,6 +72,7 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 router.put("/:id", async (req, res) => {
   const { id } = req.params;

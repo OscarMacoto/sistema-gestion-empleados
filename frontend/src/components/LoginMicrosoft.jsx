@@ -45,17 +45,9 @@ function LoginMicrosoft() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      const activeAccount = instance.getActiveAccount();
-      await instance.logoutPopup({
-        account: activeAccount,
-        postLogoutRedirectUri: "/",
-        mainWindowRedirectUri: "/",
-      });
-    } catch (error) {
-      console.error("Error en logout:", error);
-    }
+  const handleLogout = () => {
+    instance.setActiveAccount(null); 
+    navigate("/");
   };
 
   return (

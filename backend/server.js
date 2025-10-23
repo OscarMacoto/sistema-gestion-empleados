@@ -73,7 +73,7 @@ app.listen(PORT, () => {
 });
 
 
-const router = express.Router();
+/*const router = express.Router();
 
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
@@ -102,4 +102,4 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-export default router;
+export default router;*/

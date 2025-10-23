@@ -261,8 +261,8 @@ const actualizarEmpleado = async () => {
                     <button onClick={() => eliminarEmpleado(empleado.id_empleado)} className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 text-sm">
                       Eliminar
                     </button>
-                    <button onClick={() => seleccionarEmpleado(empleado)} className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm ml-2">
-                      Editar
+                    <button onClick={() => seleccionarEmpleado(empleado)} className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm">
+                      Actualizar 
                     </button>
                   </td>
                 </tr>
