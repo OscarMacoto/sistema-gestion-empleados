@@ -5,6 +5,9 @@ const Empleado = () => {
   const [empleados, setEmpleados] = useState([]);
   const [paginaActual, setPaginaActual] = useState(1);
   const empleadosPorPagina = 10;
+const [filtroNombre, setFiltroNombre] = useState("");
+const [filtroEstado, setFiltroEstado] = useState("");
+const [filtroClinica, setFiltroClinica] = useState("");
 
   const [nuevoEmpleado, setNuevoEmpleado] = useState({
     nombre: "",
@@ -123,7 +126,7 @@ useEffect(() => {
     id_estado: estadoEncontrado ? estadoEncontrado.id_estado : "",
     id_clinica: clinicaEncontrada ? clinicaEncontrada.id_clinica : "",
   }));
-}, [empleadoEditando?.estado_text, empleadoEditando?.clinica_text, estados, clinicas]);
+}, [empleadoEditando, estados, clinicas]);
 
 const actualizarEmpleado = async () => {
   try {
@@ -146,8 +149,14 @@ const actualizarEmpleado = async () => {
 
   const indiceUltimo = paginaActual * empleadosPorPagina;
   const indicePrimero = indiceUltimo - empleadosPorPagina;
-  const empleadosActuales = empleados.slice(indicePrimero, indiceUltimo);
-  const totalPaginas = Math.ceil(empleados.length / empleadosPorPagina);
+const empleadosFiltrados = empleados.filter((empleado) => {
+  const coincideNombre = empleado.nombre.toLowerCase().includes(filtroNombre.toLowerCase());
+  const coincideEstado = filtroEstado === "" || empleado.estado === filtroEstado;
+  const coincideClinica = filtroClinica === "" || empleado.clinica === filtroClinica;
+  return coincideNombre && coincideEstado && coincideClinica;
+});
+const empleadosActuales = empleadosFiltrados.slice(indicePrimero, indiceUltimo);
+const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
 
   return (
     <div>
@@ -229,6 +238,39 @@ const actualizarEmpleado = async () => {
       )}
 
       <div className="overflow-x-auto">
+<div className="flex flex-wrap gap-4 mb-4">
+  <input
+    type="text"
+    placeholder="Buscar por nombre"
+    value={filtroNombre}
+    onChange={(e) => setFiltroNombre(e.target.value)}
+    className="p-2 border rounded text-sm"
+  />
+  <select
+    value={filtroEstado}
+    onChange={(e) => setFiltroEstado(e.target.value)}
+    className="p-2 border rounded text-sm"
+  >
+    <option value="">Todos los estados</option>
+    {estados.map((estado) => (
+      <option key={estado.id_estado} value={estado.descripcion}>
+        {estado.descripcion}
+      </option>
+    ))}
+  </select>
+  <select
+    value={filtroClinica}
+    onChange={(e) => setFiltroClinica(e.target.value)}
+    className="p-2 border rounded text-sm"
+  >
+    <option value="">Todas las clínicas</option>
+    {clinicas.map((clinica) => (
+      <option key={clinica.id_clinica} value={clinica.nombre_clinica}>
+        {clinica.nombre_clinica}
+      </option>
+    ))}
+  </select>
+</div>
         <table className="min-w-full bg-white border border-gray-200 shadow-md rounded-lg text-sm">
           <thead>
             <tr className="bg-blue-200">
