@@ -29,7 +29,6 @@ const Empleado = () => {
 
   const [usuarioActivo, setUsuarioActivo] = useState({ nombre: "", correo: "" });
 
-  // --- Obtener usuario activo MSAL ---
   useEffect(() => {
     if (accounts.length > 0) {
       setUsuarioActivo({
@@ -39,7 +38,6 @@ const Empleado = () => {
     }
   }, [accounts]);
 
-  // --- Cargar datos iniciales ---
   useEffect(() => {
     obtenerEmpleados();
     obtenerEstados();
@@ -74,7 +72,6 @@ const Empleado = () => {
     }
   };
 
-  // --- Manejo de nuevo empleado ---
   const handleChangeNuevo = (e) => {
     setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: e.target.value });
   };
@@ -109,7 +106,6 @@ const Empleado = () => {
     }
   };
 
-  // --- Eliminar ---
   const eliminarEmpleado = async (id) => {
     if (window.confirm("¿Seguro que deseas eliminar este empleado?")) {
       try {
@@ -124,7 +120,6 @@ const Empleado = () => {
     }
   };
 
-  // --- Seleccionar empleado para editar ---
   const seleccionarEmpleado = (empleado) => {
     setEmpleadoEditando({
       id_empleado: empleado.id_empleado,
@@ -135,7 +130,6 @@ const Empleado = () => {
     });
   };
 
-  // --- Mapear texto a IDs al editar ---
   useEffect(() => {
     if (!empleadoEditando || estados.length === 0 || clinicas.length === 0) return;
 
@@ -157,7 +151,6 @@ const Empleado = () => {
     });
   }, [empleadoEditando?.estado_text, empleadoEditando?.clinica_text, estados, clinicas]);
 
-  // --- Actualizar empleado ---
   const actualizarEmpleado = async () => {
     try {
       if (!empleadoEditando.id_estado || !empleadoEditando.id_clinica) {
@@ -191,14 +184,12 @@ const Empleado = () => {
     }
   };
 
-  // --- Limpiar filtros ---
   const limpiarFiltros = () => {
     setFiltroNombre("");
     setFiltroEstado("");
     setFiltroClinica("");
   };
 
-  // --- Filtrado y paginación ---
   const indiceUltimo = paginaActual * empleadosPorPagina;
   const indicePrimero = indiceUltimo - empleadosPorPagina;
 
@@ -247,7 +238,6 @@ const Empleado = () => {
         </button>
       </div>
 
-      {/* Formulario Agregar */}
       {mostrarFormulario && (
         <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-6">
           <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
@@ -276,7 +266,6 @@ const Empleado = () => {
         </div>
       )}
 
-      {/* Formulario Editar */}
       {empleadoEditando && (
         <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
           <h3 className="text-lg font-semibold mb-2">Editar empleado #{empleadoEditando.id_empleado}</h3>
@@ -301,7 +290,6 @@ const Empleado = () => {
         </div>
       )}
 
-      {/* Tabla */}
       <div className="overflow-x-auto">
         <div className="flex flex-wrap items-center gap-4 mb-4">
           <input
@@ -388,7 +376,6 @@ const Empleado = () => {
         </table>
       </div>
 
-      {/* Paginación */}
       <div className="flex justify-center mt-4 space-x-2">
         {Array.from({ length: totalPaginas }, (_, i) => (
           <button key={i + 1} onClick={() => setPaginaActual(i + 1)}
