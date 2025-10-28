@@ -21,6 +21,7 @@ function LoginMicrosoft() {
 
       const account = response.account;
       const email = account.username;
+      const nombreCompleto = account.name;
 
       const empleadoResponse = await fetch(
         `http://localhost:5000/api/empleados/email/${email}`
@@ -33,11 +34,10 @@ function LoginMicrosoft() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id_empleado: empleadoData.id_empleado }),
         });
-
-        console.log("L_login actualizado para:", email);
-      } else {
-        console.warn("No se encontró empleado con el correo:", email);
       }
+
+      localStorage.setItem("usuario_email", email);
+      localStorage.setItem("usuario_nombre", nombreCompleto);
 
       navigate("/selfservice");
     } catch (error) {
@@ -46,7 +46,9 @@ function LoginMicrosoft() {
   };
 
   const handleLogout = () => {
-    instance.setActiveAccount(null); 
+    instance.setActiveAccount(null);
+    localStorage.removeItem("usuario_email");
+    localStorage.removeItem("usuario_nombre");
     navigate("/");
   };
 
@@ -73,7 +75,7 @@ function LoginMicrosoft() {
             <p className="text-gray-600 mb-4">
               Sesión activa como:
               <br />
-              <strong>{accounts[0].username}</strong>
+              <strong>{accounts[0].name}</strong>
             </p>
             <button
               onClick={handleLogout}

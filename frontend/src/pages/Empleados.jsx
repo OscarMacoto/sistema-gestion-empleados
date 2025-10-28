@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useMsal } from "@azure/msal-react";
 
 const Empleado = () => {
+  const { accounts } = useMsal();
   const [empleados, setEmpleados] = useState([]);
   const [paginaActual, setPaginaActual] = useState(1);
   const empleadosPorPagina = 10;
-const [filtroNombre, setFiltroNombre] = useState("");
-const [filtroEstado, setFiltroEstado] = useState("");
-const [filtroClinica, setFiltroClinica] = useState("");
+
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+  const [filtroClinica, setFiltroClinica] = useState("");
 
   const [nuevoEmpleado, setNuevoEmpleado] = useState({
     nombre: "",
@@ -24,6 +27,19 @@ const [filtroClinica, setFiltroClinica] = useState("");
   const [estados, setEstados] = useState([]);
   const [clinicas, setClinicas] = useState([]);
 
+  const [usuarioActivo, setUsuarioActivo] = useState({ nombre: "", correo: "" });
+
+  // --- Obtener usuario activo MSAL ---
+  useEffect(() => {
+    if (accounts.length > 0) {
+      setUsuarioActivo({
+        nombre: accounts[0].name,
+        correo: accounts[0].username,
+      });
+    }
+  }, [accounts]);
+
+  // --- Cargar datos iniciales ---
   useEffect(() => {
     obtenerEmpleados();
     obtenerEstados();
@@ -58,14 +74,24 @@ const [filtroClinica, setFiltroClinica] = useState("");
     }
   };
 
+  // --- Manejo de nuevo empleado ---
   const handleChangeNuevo = (e) => {
     setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: e.target.value });
   };
 
   const agregarEmpleado = async () => {
     try {
-      await axios.post("http://localhost:5000/api/empleados", nuevoEmpleado);
+      if (!usuarioActivo.correo) {
+        alert("No se pudo identificar al usuario activo.");
+        return;
+      }
+
+      const payload = { ...nuevoEmpleado, usuario_email: usuarioActivo.correo };
+
+      await axios.post("http://localhost:5000/api/empleados", payload);
+
       alert("Empleado agregado correctamente");
+
       setNuevoEmpleado({
         nombre: "",
         DNI: "",
@@ -83,10 +109,13 @@ const [filtroClinica, setFiltroClinica] = useState("");
     }
   };
 
+  // --- Eliminar ---
   const eliminarEmpleado = async (id) => {
     if (window.confirm("¿Seguro que deseas eliminar este empleado?")) {
       try {
-        await axios.delete(`http://localhost:5000/api/empleados/${id}`);
+        await axios.delete(`http://localhost:5000/api/empleados/${id}`, {
+          data: { usuario_email: usuarioActivo.correo },
+        });
         obtenerEmpleados();
       } catch (error) {
         alert("Error al eliminar empleado");
@@ -95,74 +124,121 @@ const [filtroClinica, setFiltroClinica] = useState("");
     }
   };
 
-const seleccionarEmpleado = (empleado) => {
-  setEmpleadoEditando({
-    id_empleado: empleado.id_empleado,
-    id_estado: "",
-    id_clinica: "",
-    estado_text: empleado.estado ?? "",
-    clinica_text: empleado.clinica ?? "",
-  });
-};
+  // --- Seleccionar empleado para editar ---
+  const seleccionarEmpleado = (empleado) => {
+    setEmpleadoEditando({
+      id_empleado: empleado.id_empleado,
+      id_estado: "",
+      id_clinica: "",
+      estado_text: empleado.estado ?? "",
+      clinica_text: empleado.clinica ?? "",
+    });
+  };
 
-useEffect(() => {
-  if (!empleadoEditando) return;
-  if (estados.length === 0 || clinicas.length === 0) return;
+  // --- Mapear texto a IDs al editar ---
+  useEffect(() => {
+    if (!empleadoEditando || estados.length === 0 || clinicas.length === 0) return;
 
-  const estadoEncontrado = estados.find(
-    (e) =>
-      e.descripcion?.trim().toLowerCase() ===
-      empleadoEditando.estado_text?.trim().toLowerCase()
-  );
-
-  const clinicaEncontrada = clinicas.find(
-    (c) =>
-      c.nombre_clinica?.trim().toLowerCase() ===
-      empleadoEditando.clinica_text?.trim().toLowerCase()
-  );
-
-  setEmpleadoEditando((prev) => ({
-    ...prev,
-    id_estado: estadoEncontrado ? estadoEncontrado.id_estado : "",
-    id_clinica: clinicaEncontrada ? clinicaEncontrada.id_clinica : "",
-  }));
-}, [empleadoEditando, estados, clinicas]);
-
-const actualizarEmpleado = async () => {
-  try {
-    await axios.put(
-      `http://localhost:5000/api/empleados/${empleadoEditando.id_empleado}`,
-      {
-        id_estado: empleadoEditando.id_estado,
-        id_clinica: empleadoEditando.id_clinica,
-      }
+    const estadoEncontrado = estados.find(
+      (e) => e.descripcion?.trim().toLowerCase() === empleadoEditando.estado_text.trim().toLowerCase()
     );
-    alert("Empleado actualizado correctamente");
-    setEmpleadoEditando(null);
-    obtenerEmpleados();
-  } catch (error) {
-    alert("Error al actualizar empleado");
-    console.error(error);
-  }
-};
 
+    const clinicaEncontrada = clinicas.find(
+      (c) => c.nombre_clinica?.trim().toLowerCase() === empleadoEditando.clinica_text.trim().toLowerCase()
+    );
 
+    setEmpleadoEditando((prev) => {
+      const nuevoEstado = estadoEncontrado ? estadoEncontrado.id_estado : "";
+      const nuevaClinica = clinicaEncontrada ? clinicaEncontrada.id_clinica : "";
+
+      if (prev.id_estado === nuevoEstado && prev.id_clinica === nuevaClinica) return prev;
+
+      return { ...prev, id_estado: nuevoEstado, id_clinica: nuevaClinica };
+    });
+  }, [empleadoEditando?.estado_text, empleadoEditando?.clinica_text, estados, clinicas]);
+
+  // --- Actualizar empleado ---
+  const actualizarEmpleado = async () => {
+    try {
+      if (!empleadoEditando.id_estado || !empleadoEditando.id_clinica) {
+        alert("Debes seleccionar Estado y Clínica para actualizar");
+        return;
+      }
+
+      if (!usuarioActivo.correo) {
+        alert("No se ha podido identificar al usuario activo.");
+        return;
+      }
+
+      const payload = {
+        id_estado: Number(empleadoEditando.id_estado),
+        id_clinica: Number(empleadoEditando.id_clinica),
+        usuario_email: usuarioActivo.correo,
+      };
+
+      await axios.put(
+        `http://localhost:5000/api/empleados/${empleadoEditando.id_empleado}`,
+        payload
+      );
+
+      alert("Empleado actualizado correctamente");
+      setEmpleadoEditando(null);
+      obtenerEmpleados();
+    } catch (error) {
+      const mensaje = error.response?.data?.error || "Error al actualizar empleado";
+      alert(mensaje);
+      console.error(error);
+    }
+  };
+
+  // --- Limpiar filtros ---
+  const limpiarFiltros = () => {
+    setFiltroNombre("");
+    setFiltroEstado("");
+    setFiltroClinica("");
+  };
+
+  // --- Filtrado y paginación ---
   const indiceUltimo = paginaActual * empleadosPorPagina;
   const indicePrimero = indiceUltimo - empleadosPorPagina;
-const empleadosFiltrados = empleados.filter((empleado) => {
-  const coincideNombre = empleado.nombre.toLowerCase().includes(filtroNombre.toLowerCase());
-  const coincideEstado = filtroEstado === "" || empleado.estado === filtroEstado;
-  const coincideClinica = filtroClinica === "" || empleado.clinica === filtroClinica;
-  return coincideNombre && coincideEstado && coincideClinica;
-});
-const empleadosActuales = empleadosFiltrados.slice(indicePrimero, indiceUltimo);
-const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
+
+  const normalizar = (texto) => {
+    return texto
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  };
+
+  const empleadosFiltrados = empleados.filter((empleado) => {
+    const nombreNormalizado = normalizar(empleado.nombre);
+    const estadoNormalizado = normalizar(empleado.estado);
+    const clinicaNormalizado = normalizar(empleado.clinica);
+
+    const filtroNombreNormalizado = normalizar(filtroNombre);
+    const filtroEstadoNormalizado = normalizar(filtroEstado);
+    const filtroClinicaNormalizado = normalizar(filtroClinica);
+
+    const coincideNombre = nombreNormalizado.includes(filtroNombreNormalizado);
+    const coincideEstado = filtroEstado === "" || estadoNormalizado === filtroEstadoNormalizado;
+    const coincideClinica = filtroClinica === "" || clinicaNormalizado === filtroClinicaNormalizado;
+
+    return coincideNombre && coincideEstado && coincideClinica;
+  });
+
+  const empleadosActuales = empleadosFiltrados.slice(indicePrimero, indiceUltimo);
+  const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
+
+  const formatFecha = (fecha) => (fecha ? fecha.split("T")[0] : "");
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-center mb-6">Gestión de Empleados</h2>
 
-      <div className="flex justify-left mb-4">
+      <p className="mb-4 text-right text-gray-700">
+        Usuario actual: {usuarioActivo.nombre || "Sistema"}
+      </p>
+
+      <div className="flex justify-left mb-4 gap-2">
         <button
           onClick={() => setMostrarFormulario(!mostrarFormulario)}
           className="bg-green-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -171,106 +247,104 @@ const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
         </button>
       </div>
 
+      {/* Formulario Agregar */}
       {mostrarFormulario && (
         <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-6">
           <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
           <div className="grid grid-cols-2 gap-4">
-            <input name="nombre" placeholder="Nombre" value={nuevoEmpleado.nombre} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
-            <input name="DNI" placeholder="DNI" value={nuevoEmpleado.DNI} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
-            <input name="correo" placeholder="Correo" value={nuevoEmpleado.correo} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
-            <input name="telefono" placeholder="Teléfono" value={nuevoEmpleado.telefono} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
-            <input name="direccion" placeholder="Dirección" value={nuevoEmpleado.direccion} onChange={handleChangeNuevo} className="p-2 border rounded text-sm" />
+            <input name="nombre" placeholder="Nombre" value={nuevoEmpleado.nombre} onChange={handleChangeNuevo} className="p-2 border rounded text-sm"/>
+            <input name="DNI" placeholder="DNI" value={nuevoEmpleado.DNI} onChange={handleChangeNuevo} className="p-2 border rounded text-sm"/>
+            <input name="correo" placeholder="Correo" value={nuevoEmpleado.correo} onChange={handleChangeNuevo} className="p-2 border rounded text-sm"/>
+            <input name="telefono" placeholder="Teléfono" value={nuevoEmpleado.telefono} onChange={handleChangeNuevo} className="p-2 border rounded text-sm"/>
+            <input name="direccion" placeholder="Dirección" value={nuevoEmpleado.direccion} onChange={handleChangeNuevo} className="p-2 border rounded text-sm"/>
             <select name="id_estado" value={nuevoEmpleado.id_estado} onChange={handleChangeNuevo} className="p-2 border rounded text-sm">
               <option value="">Seleccionar estado...</option>
               {estados.map((estado) => (
-                <option key={estado.id_estado} value={estado.id_estado}>
-                  {estado.descripcion}
-                </option>
+                <option key={estado.id_estado} value={estado.id_estado}>{estado.descripcion}</option>
               ))}
             </select>
             <select name="id_clinica" value={nuevoEmpleado.id_clinica} onChange={handleChangeNuevo} className="p-2 border rounded text-sm">
               <option value="">Seleccionar clínica...</option>
               {clinicas.map((clinica) => (
-                <option key={clinica.id_clinica} value={clinica.id_clinica}>
-                  {clinica.nombre_clinica}
-                </option>
+                <option key={clinica.id_clinica} value={clinica.id_clinica}>{clinica.nombre_clinica}</option>
               ))}
             </select>
           </div>
           <div className="flex justify-center mt-4">
-            <button onClick={agregarEmpleado} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-              Guardar empleado
-            </button>
+            <button onClick={agregarEmpleado} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Guardar empleado</button>
           </div>
         </div>
       )}
 
+      {/* Formulario Editar */}
       {empleadoEditando && (
         <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
           <h3 className="text-lg font-semibold mb-2">Editar empleado #{empleadoEditando.id_empleado}</h3>
           <div className="grid grid-cols-2 gap-4">
-            <select name="id_estado" value={empleadoEditando.id_estado} onChange={(e) => setEmpleadoEditando({ ...empleadoEditando, id_estado: e.target.value })} className="p-2 border rounded text-sm">
+            <select name="id_estado" value={empleadoEditando.id_estado} onChange={(e) => setEmpleadoEditando({...empleadoEditando, id_estado: e.target.value})} className="p-2 border rounded text-sm">
               <option value="">Seleccionar estado...</option>
               {estados.map((estado) => (
-                <option key={estado.id_estado} value={estado.id_estado}>
-                  {estado.descripcion}
-                </option>
+                <option key={estado.id_estado} value={estado.id_estado}>{estado.descripcion}</option>
               ))}
             </select>
-            <select name="id_clinica" value={empleadoEditando.id_clinica} onChange={(e) => setEmpleadoEditando({ ...empleadoEditando, id_clinica: e.target.value })} className="p-2 border rounded text-sm">
+            <select name="id_clinica" value={empleadoEditando.id_clinica} onChange={(e) => setEmpleadoEditando({...empleadoEditando, id_clinica: e.target.value})} className="p-2 border rounded text-sm">
               <option value="">Seleccionar clínica...</option>
               {clinicas.map((clinica) => (
-                <option key={clinica.id_clinica} value={clinica.id_clinica}>
-                  {clinica.nombre_clinica}
-                </option>
+                <option key={clinica.id_clinica} value={clinica.id_clinica}>{clinica.nombre_clinica}</option>
               ))}
             </select>
           </div>
           <div className="flex justify-center mt-4 gap-4">
-            <button onClick={actualizarEmpleado} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-              Guardar cambios
-            </button>
-            <button onClick={() => setEmpleadoEditando(null)} className="bg-red-400 text-white px-4 py-2 rounded hover:bg-gray-500">
-              Cancelar
-            </button>
+            <button onClick={actualizarEmpleado} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Guardar cambios</button>
+            <button onClick={() => setEmpleadoEditando(null)} className="bg-red-400 text-white px-4 py-2 rounded hover:bg-gray-500">Cancelar</button>
           </div>
         </div>
       )}
 
+      {/* Tabla */}
       <div className="overflow-x-auto">
-<div className="flex flex-wrap gap-4 mb-4">
-  <input
-    type="text"
-    placeholder="Buscar por nombre"
-    value={filtroNombre}
-    onChange={(e) => setFiltroNombre(e.target.value)}
-    className="p-2 border rounded text-sm"
-  />
-  <select
-    value={filtroEstado}
-    onChange={(e) => setFiltroEstado(e.target.value)}
-    className="p-2 border rounded text-sm"
-  >
-    <option value="">Todos los estados</option>
-    {estados.map((estado) => (
-      <option key={estado.id_estado} value={estado.descripcion}>
-        {estado.descripcion}
-      </option>
-    ))}
-  </select>
-  <select
-    value={filtroClinica}
-    onChange={(e) => setFiltroClinica(e.target.value)}
-    className="p-2 border rounded text-sm"
-  >
-    <option value="">Todas las clínicas</option>
-    {clinicas.map((clinica) => (
-      <option key={clinica.id_clinica} value={clinica.nombre_clinica}>
-        {clinica.nombre_clinica}
-      </option>
-    ))}
-  </select>
-</div>
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <input
+            type="text"
+            placeholder="Buscar por nombre"
+            value={filtroNombre}
+            onChange={(e) => setFiltroNombre(e.target.value)}
+            className="p-2 border rounded text-sm"
+          />
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="p-2 border rounded text-sm"
+          >
+            <option value="">Todos los estados</option>
+            {estados.map((estado) => (
+              <option key={estado.id_estado} value={estado.descripcion}>
+                {estado.descripcion}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={filtroClinica}
+              onChange={(e) => setFiltroClinica(e.target.value)}
+              className="p-2 border rounded text-sm"
+            >
+              <option value="">Todas las clínicas</option>
+              {clinicas.map((clinica) => (
+                <option key={clinica.id_clinica} value={clinica.nombre_clinica}>
+                  {clinica.nombre_clinica}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={limpiarFiltros}
+              className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-700 text-sm"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+
         <table className="min-w-full bg-white border border-gray-200 shadow-md rounded-lg text-sm">
           <thead>
             <tr className="bg-blue-200">
@@ -294,39 +368,31 @@ const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
                   <td className="py-1 px-2">{empleado.nombre}</td>
                   <td className="py-1 px-2">{empleado.DNI}</td>
                   <td className="py-1 px-2">{empleado.correo}</td>
-                  <td className="py-1 px-2">{empleado.fecha_ingreso}</td>
+                  <td className="py-1 px-2">{formatFecha(empleado.fecha_ingreso)}</td>
                   <td className="py-1 px-2">{empleado.telefono}</td>
                   <td className="py-1 px-2">{empleado.direccion}</td>
                   <td className="py-1 px-2">{empleado.estado}</td>
                   <td className="py-1 px-2">{empleado.clinica}</td>
-                  <td className="py-1 px-2">
-                    <button onClick={() => eliminarEmpleado(empleado.id_empleado)} className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 text-sm">
-                      Eliminar
-                    </button>
-                    <button onClick={() => seleccionarEmpleado(empleado)} className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm">
-                      Actualizar 
-                    </button>
+                  <td className="py-1 px-2 flex gap-1 justify-center">
+                    <button onClick={() => eliminarEmpleado(empleado.id_empleado)} className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 text-sm">Eliminar</button>
+                    <button onClick={() => seleccionarEmpleado(empleado)} className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm">Actualizar</button>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="text-center py-3 text-gray-500">
-                  No hay empleados registrados
-                </td>
+                <td colSpan="10" className="text-center py-3 text-gray-500">No hay empleados registrados</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
 
+      {/* Paginación */}
       <div className="flex justify-center mt-4 space-x-2">
         {Array.from({ length: totalPaginas }, (_, i) => (
-          <button
-            key={i + 1}
-            onClick={() => setPaginaActual(i + 1)}
-            className={`px-3 py-1 rounded text-sm ${paginaActual === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-          >
+          <button key={i + 1} onClick={() => setPaginaActual(i + 1)}
+            className={`px-3 py-1 rounded text-sm ${paginaActual === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200"}`}>
             {i + 1}
           </button>
         ))}

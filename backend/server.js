@@ -26,7 +26,7 @@ app.get("/api/empleados/email/:correo", async (req, res) => {
     const result = await pool.request()
       .input("correo", sql.VarChar, correo)
       .query(`
-        SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.telefono,
+        SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.telefono, e.direccion,
                c.nombre_clinica AS clinica, est.descripcion AS estado
         FROM Empleado e
         INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
@@ -71,35 +71,3 @@ app.post("/api/sso/actualizar-login", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
-
-
-/*const router = express.Router();
-
-router.put("/:id", async (req, res) => {
-  const { id } = req.params;
-  const { id_clinica, id_estado } = req.body;
-
-  if (!id_clinica || !id_estado) {
-    return res.status(400).json({ error: "Faltan datos obligatorios" });
-  }
-
-  try {
-    const pool = await connectDB();
-    await pool.request()
-      .input("id_empleado", sql.Int, id)
-      .input("id_clinica", sql.Int, id_clinica)
-      .input("id_estado", sql.Int, id_estado)
-      .query(`
-        UPDATE Empleado
-        SET id_clinica = @id_clinica, id_estado = @id_estado
-        WHERE id_empleado = @id_empleado
-      `);
-
-    res.status(200).json({ message: "Empleado actualizado correctamente" });
-  } catch (error) {
-    console.error("Error al actualizar empleado:", error);
-    res.status(500).json({ error: "Error al actualizar empleado" });
-  }
-});
-
-export default router;*/

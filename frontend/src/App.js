@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { MsalProvider, useIsAuthenticated, useMsal } from "@azure/msal-react";
 import { PublicClientApplication } from "@azure/msal-browser";
+import { useState, useEffect } from "react";
 
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
@@ -8,8 +9,8 @@ import Empleados from "./pages/Empleados";
 import Clinicas from "./pages/Clinicas";
 import Estados from "./pages/Estados";
 import SSO from "./pages/SSO";
-import LoginMicrosoft from "./components/LoginMicrosoft";
 import SelfService from "./pages/SelfService";
+import LoginMicrosoft from "./components/LoginMicrosoft";
 
 const msalConfig = {
   auth: {
@@ -24,10 +25,18 @@ const msalInstance = new PublicClientApplication(msalConfig);
 function AppContent() {
   const isAuthenticated = useIsAuthenticated();
   const { instance } = useMsal();
+  const [showWelcome, setShowWelcome] = useState(true);
 
   const handleLogout = () => {
     instance.logoutPopup({ postLogoutRedirectUri: window.location.origin });
   };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const timer = setTimeout(() => setShowWelcome(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -38,6 +47,18 @@ function AppContent() {
           </h2>
           <LoginMicrosoft />
         </div>
+      </div>
+    );
+  }
+
+  if (showWelcome) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <img
+          src="/welcome-image.png"
+          alt="Bienvenido"
+          className="max-w-md"
+        />
       </div>
     );
   }
@@ -54,7 +75,6 @@ function AppContent() {
           Cerrar sesión
         </button>
         <Routes>
-
           <Route path="/" element={<Empleados />} />
           <Route path="/clinicas" element={<Clinicas />} />
           <Route path="/estados" element={<Estados />} />
