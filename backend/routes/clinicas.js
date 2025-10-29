@@ -3,7 +3,6 @@ import { connectDB } from "../db.js";
 
 const router = express.Router();
 
-// Obtener todas las clínicas
 router.get("/", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -20,7 +19,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Agregar una nueva clínica
 router.post("/", async (req, res) => {
   const { nombre_clinica } = req.body;
 

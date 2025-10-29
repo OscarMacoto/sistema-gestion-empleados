@@ -52,7 +52,6 @@ function Estados() {
         </tbody>
       </table>
 
-      {/* Paginación */}
       <div className="flex justify-center items-center mt-4 gap-2">
         <button
           onClick={() => setPagina(pagina - 1)}
