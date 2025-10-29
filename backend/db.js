@@ -11,13 +11,22 @@ const dbConfig = {
   },
 };
 
+let poolGlobal = null;
+
 async function connectDB() {
   try {
-    const pool = await sql.connect(dbConfig);
-    console.log("Conectado a la base de datos");
-    return pool;
+    if (poolGlobal) {
+      if (poolGlobal.connected) return poolGlobal;
+      await poolGlobal.connect();
+      return poolGlobal;
+    }
+
+    poolGlobal = await sql.connect(dbConfig);
+    console.log("✅ Conectado a la base de datos (pool inicializado)");
+    return poolGlobal;
   } catch (error) {
-    console.error("Error de conexión:", error);
+    console.error("❌ Error de conexión a la base de datos:", error);
+    poolGlobal = null; 
     throw error;
   }
 }

@@ -20,6 +20,7 @@ const Empleado = () => {
     direccion: "",
     id_estado: "",
     id_clinica: "",
+    foto: null,
   });
 
   const [empleadoEditando, setEmpleadoEditando] = useState(null);
@@ -59,7 +60,7 @@ const Empleado = () => {
       const res = await axios.get("http://localhost:5000/api/empleados/estados/lista");
       setEstados(res.data);
     } catch (error) {
-      console.error("Error al obtener estados:", error);
+      console.error(error);
     }
   };
 
@@ -68,12 +69,34 @@ const Empleado = () => {
       const res = await axios.get("http://localhost:5000/api/empleados/clinicas/lista");
       setClinicas(res.data);
     } catch (error) {
-      console.error("Error al obtener clínicas:", error);
+      console.error(error);
     }
   };
 
   const handleChangeNuevo = (e) => {
     setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: e.target.value });
+  };
+
+  const handleFotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNuevoEmpleado({ ...nuevoEmpleado, foto: reader.result.split(",")[1] });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFotoEdit = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEmpleadoEditando({ ...empleadoEditando, foto: reader.result.split(",")[1] });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const agregarEmpleado = async () => {
@@ -97,7 +120,9 @@ const Empleado = () => {
         direccion: "",
         id_estado: "",
         id_clinica: "",
+        foto: null,
       });
+
       obtenerEmpleados();
       setMostrarFormulario(false);
     } catch (error) {
@@ -109,12 +134,16 @@ const Empleado = () => {
   const eliminarEmpleado = async (id) => {
     if (window.confirm("¿Seguro que deseas eliminar este empleado?")) {
       try {
-        await axios.delete(`http://localhost:5000/api/empleados/${id}`, {
+        const res = await axios.delete(`http://localhost:5000/api/empleados/${id}`, {
           data: { usuario_email: usuarioActivo.correo },
         });
+
+        alert(res.data.message || "Empleado eliminado correctamente.");
+
         obtenerEmpleados();
       } catch (error) {
-        alert("Error al eliminar empleado");
+        const mensaje = error.response?.data?.error || "Error al eliminar empleado";
+        alert(mensaje);
         console.error(error);
       }
     }
@@ -127,6 +156,7 @@ const Empleado = () => {
       id_clinica: "",
       estado_text: empleado.estado ?? "",
       clinica_text: empleado.clinica ?? "",
+      foto: empleado.foto ?? null,
     });
   };
 
@@ -167,6 +197,7 @@ const Empleado = () => {
         id_estado: Number(empleadoEditando.id_estado),
         id_clinica: Number(empleadoEditando.id_clinica),
         usuario_email: usuarioActivo.correo,
+        foto: empleadoEditando.foto ?? undefined,
       };
 
       await axios.put(
@@ -219,7 +250,7 @@ const Empleado = () => {
   const empleadosActuales = empleadosFiltrados.slice(indicePrimero, indiceUltimo);
   const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
 
-  const formatFecha = (fecha) => (fecha ? fecha.split("T")[0] : "");
+  const formatFecha = (fecha) => fecha ? fecha.split("T")[0] : "";
 
   return (
     <div>
@@ -259,6 +290,7 @@ const Empleado = () => {
                 <option key={clinica.id_clinica} value={clinica.id_clinica}>{clinica.nombre_clinica}</option>
               ))}
             </select>
+            <input type="file" onChange={handleFotoChange} className="p-2 border rounded text-sm"/>
           </div>
           <div className="flex justify-center mt-4">
             <button onClick={agregarEmpleado} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Guardar empleado</button>
@@ -282,6 +314,10 @@ const Empleado = () => {
                 <option key={clinica.id_clinica} value={clinica.id_clinica}>{clinica.nombre_clinica}</option>
               ))}
             </select>
+            <input type="file" onChange={handleFotoEdit} className="p-2 border rounded text-sm"/>
+            {empleadoEditando.foto && (
+              <img src={`data:image/jpeg;base64,${empleadoEditando.foto}`} alt="Empleado" className="w-24 h-24 rounded-2xl object-cover shadow-md border border-gray-200"/>
+            )}
           </div>
           <div className="flex justify-center mt-4 gap-4">
             <button onClick={actualizarEmpleado} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Guardar cambios</button>
@@ -291,51 +327,32 @@ const Empleado = () => {
       )}
 
       <div className="overflow-x-auto">
-        <div className="flex flex-wrap items-center gap-4 mb-4">
-          <input
-            type="text"
-            placeholder="Buscar por nombre"
-            value={filtroNombre}
-            onChange={(e) => setFiltroNombre(e.target.value)}
-            className="p-2 border rounded text-sm"
-          />
-          <select
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-            className="p-2 border rounded text-sm"
-          >
+        <div className="flex flex-wrap gap-4 mb-4">
+          <input type="text" placeholder="Buscar por nombre" value={filtroNombre} onChange={(e) => setFiltroNombre(e.target.value)} className="p-2 border rounded text-sm"/>
+          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="p-2 border rounded text-sm">
             <option value="">Todos los estados</option>
             {estados.map((estado) => (
-              <option key={estado.id_estado} value={estado.descripcion}>
-                {estado.descripcion}
-              </option>
+              <option key={estado.id_estado} value={estado.descripcion}>{estado.descripcion}</option>
             ))}
           </select>
-          <div className="flex items-center gap-2">
-            <select
-              value={filtroClinica}
-              onChange={(e) => setFiltroClinica(e.target.value)}
-              className="p-2 border rounded text-sm"
-            >
-              <option value="">Todas las clínicas</option>
-              {clinicas.map((clinica) => (
-                <option key={clinica.id_clinica} value={clinica.nombre_clinica}>
-                  {clinica.nombre_clinica}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={limpiarFiltros}
-              className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-700 text-sm"
-            >
-              Limpiar
-            </button>
-          </div>
+          <select value={filtroClinica} onChange={(e) => setFiltroClinica(e.target.value)} className="p-2 border rounded text-sm">
+            <option value="">Todas las clínicas</option>
+            {clinicas.map((clinica) => (
+              <option key={clinica.id_clinica} value={clinica.nombre_clinica}>{clinica.nombre_clinica}</option>
+            ))}
+          </select>
+          <button
+            onClick={limpiarFiltros}
+            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Limpiar filtros
+          </button>
         </div>
 
         <table className="min-w-full bg-white border border-gray-200 shadow-md rounded-lg text-sm">
           <thead>
             <tr className="bg-blue-200">
+              <th className="py-1 px-2 border">Foto</th>
               <th className="py-1 px-2 border">ID</th>
               <th className="py-1 px-2 border">Nombre</th>
               <th className="py-1 px-2 border">DNI</th>
@@ -352,6 +369,13 @@ const Empleado = () => {
             {empleadosActuales.length > 0 ? (
               empleadosActuales.map((empleado) => (
                 <tr key={empleado.id_empleado} className="text-center border-b">
+                  <td className="py-1 px-2">
+                    {empleado.foto ? (
+                      <img src={`data:image/jpeg;base64,${empleado.foto}`} alt="Empleado" className="w-20 h-20 rounded-2xl object-cover shadow-md border border-gray-200 mx-auto"/>
+                    ) : (
+                      <div className="w-20 h-20 bg-gray-300 rounded-2xl shadow-md border border-gray-200 mx-auto"></div>
+                    )}
+                  </td>
                   <td className="py-1 px-2">{empleado.id_empleado}</td>
                   <td className="py-1 px-2">{empleado.nombre}</td>
                   <td className="py-1 px-2">{empleado.DNI}</td>
@@ -369,7 +393,7 @@ const Empleado = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="text-center py-3 text-gray-500">No hay empleados registrados</td>
+                <td colSpan="11" className="text-center py-3 text-gray-500">No hay empleados registrados</td>
               </tr>
             )}
           </tbody>

@@ -1,5 +1,5 @@
 import express from "express";
-import { connectDB } from "../db.js";
+import { connectDB, sql } from "../db.js";
 
 const router = express.Router();
 
@@ -7,15 +7,13 @@ router.get("/", async (req, res) => {
   try {
     const pool = await connectDB();
     const result = await pool.request().query(`
-      SELECT 
-        id_clinica, 
-        nombre_clinica 
+      SELECT id_clinica, nombre_clinica 
       FROM Clinica
     `);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error al obtener clínicas:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Error al obtener clínicas" });
   }
 });
 
@@ -28,16 +26,18 @@ router.post("/", async (req, res) => {
 
   try {
     const pool = await connectDB();
-    await pool.request()
-      .input("nombre_clinica", nombre_clinica)
+    await pool
+      .request()
+      .input("nombre_clinica", sql.VarChar, nombre_clinica)
       .query(`
         INSERT INTO Clinica (nombre_clinica)
         VALUES (@nombre_clinica)
       `);
+
     res.status(201).json({ message: "Clínica agregada exitosamente." });
   } catch (err) {
     console.error("Error al agregar clínica:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Error al agregar clínica" });
   }
 });
 

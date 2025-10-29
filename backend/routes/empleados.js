@@ -8,15 +8,22 @@ router.get("/", async (req, res) => {
   try {
     const pool = await connectDB();
     const result = await pool.request().query(`
-      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
-             e.telefono, e.direccion,
+      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso,
+             e.telefono, e.direccion, e.foto,
              c.nombre_clinica AS clinica,
-             est.descripcion AS estado
+             est.descripcion AS estado,
+             e.fecha_salida
       FROM Empleado e
       INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
       INNER JOIN Estado_empleado est ON e.id_estado = est.id_estado
     `);
-    res.json(result.recordset);
+
+    const empleados = result.recordset.map(emp => ({
+      ...emp,
+      foto: emp.foto ? emp.foto.toString("base64") : null
+    }));
+
+    res.json(empleados);
   } catch (err) {
     console.error("Error al obtener empleados:", err);
     res.status(500).json({ error: "Error al obtener empleados" });
@@ -46,7 +53,7 @@ router.get("/clinicas/lista", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, usuario_email } = req.body;
+  const { nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, usuario_email, foto } = req.body;
 
   if (!nombre || !DNI || !correo || !id_estado || !id_clinica || !usuario_email) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
@@ -54,6 +61,7 @@ router.post("/", async (req, res) => {
 
   try {
     const pool = await connectDB();
+    const fotoBuffer = foto ? Buffer.from(foto, "base64") : null;
 
     const insertResult = await pool
       .request()
@@ -64,9 +72,10 @@ router.post("/", async (req, res) => {
       .input("direccion", sql.VarChar, direccion || "")
       .input("id_estado", sql.Int, Number(id_estado))
       .input("id_clinica", sql.Int, Number(id_clinica))
+      .input("foto", sql.VarBinary(sql.MAX), fotoBuffer)
       .query(`
-        INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, fecha_ingreso)
-        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, GETDATE());
+        INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, fecha_ingreso, foto)
+        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, GETDATE(), @foto);
         SELECT SCOPE_IDENTITY() AS id_empleado;
       `);
 
@@ -93,7 +102,7 @@ router.post("/", async (req, res) => {
         VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
       `);
 
-    res.json({ success: true, id_empleado: nuevoEmpleadoId });
+    res.json({ success: true, message: "Empleado agregado correctamente", id_empleado: nuevoEmpleadoId });
   } catch (err) {
     console.error("Error al agregar empleado:", err);
     res.status(500).json({ error: "Error al agregar empleado" });
@@ -102,11 +111,10 @@ router.post("/", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { id_estado, id_clinica, usuario_email } = req.body;
+  const { id_estado, id_clinica, usuario_email, foto } = req.body;
 
-  if (!id_estado || !id_clinica || !usuario_email) {
+  if (!id_estado || !id_clinica || !usuario_email)
     return res.status(400).json({ error: "Faltan campos obligatorios para actualizar" });
-  }
 
   try {
     const pool = await connectDB();
@@ -115,7 +123,7 @@ router.put("/:id", async (req, res) => {
       .request()
       .input("id", sql.Int, id)
       .query(`
-        SELECT e.id_empleado, e.nombre, e.id_estado,
+        SELECT e.id_empleado, e.nombre, e.fecha_salida,
                est.descripcion AS estado,
                c.nombre_clinica AS clinica
         FROM Empleado e
@@ -129,32 +137,47 @@ router.put("/:id", async (req, res) => {
 
     const actual = actualResult.recordset[0];
 
-    const estadoNuevoRes = await pool
+    const estadoNuevo = await pool
       .request()
       .input("id_estado", sql.Int, id_estado)
       .query("SELECT descripcion FROM Estado_empleado WHERE id_estado = @id_estado");
 
-    const estadoNuevo = estadoNuevoRes.recordset[0].descripcion;
+    const clinicaNueva = await pool
+      .request()
+      .input("id_clinica", sql.Int, id_clinica)
+      .query("SELECT nombre_clinica FROM Clinica WHERE id_clinica = @id_clinica");
 
-    let updateFechaSalida = "";
-    if (["Despedido", "Renuncia"].includes(estadoNuevo)) {
-      updateFechaSalida = ", fecha_salida = GETDATE()";
-    } else if (estadoNuevo === "Activo") {
-      updateFechaSalida = ", fecha_salida = NULL";
+    const nuevoEstadoDesc = (estadoNuevo.recordset[0]?.descripcion || "").trim().toLowerCase();
+
+    let fechaSalidaClause = "";
+    if (["despedido", "renuncia"].includes(nuevoEstadoDesc)) {
+      fechaSalidaClause = "fecha_salida = GETDATE()";
+    } else if (["activo", "on leave", "onleave"].includes(nuevoEstadoDesc)) {
+      fechaSalidaClause = "fecha_salida = NULL";
     }
 
-    await pool
-      .request()
+    const fotoBuffer = foto ? Buffer.from(foto, "base64") : null;
+
+    const updates = [];
+    if (fechaSalidaClause) updates.push(fechaSalidaClause);
+    updates.push("id_estado = @id_estado");
+    updates.push("id_clinica = @id_clinica");
+    if (fotoBuffer) updates.push("foto = @foto");
+
+    const updateQuery = `
+      UPDATE Empleado
+      SET ${updates.join(", ")}
+      WHERE id_empleado = @id
+    `;
+
+    const request = pool.request()
       .input("id_estado", sql.Int, id_estado)
       .input("id_clinica", sql.Int, id_clinica)
-      .input("id", sql.Int, id)
-      .query(`
-        UPDATE Empleado
-        SET id_estado = @id_estado,
-            id_clinica = @id_clinica
-            ${updateFechaSalida}
-        WHERE id_empleado = @id
-      `);
+      .input("id", sql.Int, id);
+
+    if (fotoBuffer) request.input("foto", sql.VarBinary(sql.MAX), fotoBuffer);
+
+    await request.query(updateQuery);
 
     const usuarioResult = await pool
       .request()
@@ -166,11 +189,6 @@ router.put("/:id", async (req, res) => {
 
     const usuarioActual = usuarioResult.recordset[0];
 
-    const clinicaNueva = await pool
-      .request()
-      .input("id_clinica", sql.Int, id_clinica)
-      .query("SELECT nombre_clinica FROM Clinica WHERE id_clinica = @id_clinica");
-
     await pool
       .request()
       .input("id_empleado", sql.Int, usuarioActual.id_empleado)
@@ -179,14 +197,14 @@ router.put("/:id", async (req, res) => {
       .input(
         "detalles",
         sql.VarChar,
-        `El usuario ${usuarioActual.nombre} ha actualizado a ${actual.nombre} los campos: Estado de ${actual.estado} a ${estadoNuevo} y Clínica de ${actual.clinica} a ${clinicaNueva.recordset[0].nombre_clinica}`
+        `El usuario ${usuarioActual.nombre} ha actualizado a ${actual.nombre} cambiando el Estado de ${actual.estado} a ${estadoNuevo.recordset[0].descripcion} y la Clínica de ${actual.clinica} a ${clinicaNueva.recordset[0].nombre_clinica}`
       )
       .query(`
         INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
         VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
       `);
 
-    res.json({ success: true });
+    res.json({ success: true, message: "Empleado actualizado correctamente" });
   } catch (err) {
     console.error("Error al actualizar empleado:", err);
     res.status(500).json({ error: "Error al actualizar empleado" });
@@ -202,6 +220,9 @@ router.delete("/:id", async (req, res) => {
 
   try {
     const pool = await connectDB();
+
+    await pool.request().input("id", sql.Int, id).query("DELETE FROM Historial_clinica WHERE id_empleado = @id");
+    await pool.request().input("id", sql.Int, id).query("DELETE FROM CuentaSSO WHERE id_empleado = @id");
 
     const empleadoResult = await pool
       .request()
@@ -236,7 +257,7 @@ router.delete("/:id", async (req, res) => {
         VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
       `);
 
-    res.json({ success: true });
+    res.json({ success: true, message: "Empleado eliminado correctamente" });
   } catch (err) {
     console.error("Error al eliminar empleado:", err);
     res.status(500).json({ error: "Error al eliminar empleado" });

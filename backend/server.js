@@ -11,8 +11,10 @@ import ssoRoutes from "./routes/sso.js";
 const app = express();
 const PORT = 5000;
 
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
 app.use(cors({ origin: "http://localhost:3000" }));
-app.use(express.json());
 
 app.use("/api/empleados", empleadosRoutes);
 app.use("/api/clinicas", clinicasRoutes);
@@ -26,8 +28,16 @@ app.get("/api/empleados/email/:correo", async (req, res) => {
     const result = await pool.request()
       .input("correo", sql.VarChar, correo)
       .query(`
-        SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.telefono, e.direccion,
-               c.nombre_clinica AS clinica, est.descripcion AS estado
+        SELECT 
+          e.id_empleado, 
+          e.nombre, 
+          e.DNI, 
+          e.correo, 
+          e.fecha_ingreso, 
+          e.telefono, 
+          e.direccion,
+          c.nombre_clinica AS clinica, 
+          est.descripcion AS estado
         FROM Empleado e
         INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
         INNER JOIN Estado_empleado est ON e.id_estado = est.id_estado
@@ -68,6 +78,14 @@ app.post("/api/sso/actualizar-login", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
-});
+(async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`Servidor corriendo en el puerto ${PORT}`);
+      console.log("Conexión a la base de datos establecida correctamente.");
+    });
+  } catch (err) {
+    console.error("Error al iniciar el servidor:", err);
+  }
+})();
