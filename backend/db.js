@@ -31,7 +31,7 @@ export async function connectDB() {
     poolGlobal = new sql.ConnectionPool(dbConfig);
 
     poolGlobal.on("error", (err) => {
-      console.error("⚠️ Error en el pool SQL:", err);
+      console.error("Error en el pool SQL:", err);
       poolGlobal = null; 
     });
 

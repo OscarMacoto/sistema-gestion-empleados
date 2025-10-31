@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useMsal } from "@azure/msal-react";
 
-// Componente reutilizable para selects
 const SelectInput = ({ name, value, onChange, options, placeholder }) => (
   <select name={name} value={value} onChange={onChange} className="p-2 border rounded text-sm">
     <option value="">{placeholder}</option>
@@ -14,7 +13,6 @@ const SelectInput = ({ name, value, onChange, options, placeholder }) => (
   </select>
 );
 
-// Componente para subir fotos
 const FotoInput = ({ foto, setFoto }) => {
   const handleChange = (e) => {
     const file = e.target.files[0];
@@ -66,24 +64,29 @@ const Empleado = () => {
     obtenerClinicas();
   }, []);
 
-  const obtenerEmpleados = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/empleados");
-      setEmpleados(Array.isArray(res.data) ? res.data : []);
-    } catch (error) {
-      console.error("Error al obtener empleados:", error);
-      setEmpleados([]);
-    }
-  };
+ const obtenerEmpleados = async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/empleados");
+    setEmpleados(Array.isArray(res.data.empleados) ? res.data.empleados : []);
+    console.log("Empleados obtenidos:", res.data.empleados);
+  } catch (error) {
+    console.error("Error al obtener empleados:", error);
+    setEmpleados([]);
+  }
+};
 
   const obtenerEstados = async () => {
-    try { const res = await axios.get("http://localhost:5000/api/empleados/estados/lista"); setEstados(res.data); } 
-    catch (error) { console.error(error); }
+    try { 
+      const res = await axios.get("http://localhost:5000/api/empleados/estados/lista"); 
+      setEstados(res.data); 
+    } catch (error) { console.error(error); }
   };
 
   const obtenerClinicas = async () => {
-    try { const res = await axios.get("http://localhost:5000/api/empleados/clinicas/lista"); setClinicas(res.data); } 
-    catch (error) { console.error(error); }
+    try { 
+      const res = await axios.get("http://localhost:5000/api/empleados/clinicas/lista"); 
+      setClinicas(res.data); 
+    } catch (error) { console.error(error); }
   };
 
   const handleChangeNuevo = (e) => setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: e.target.value });
@@ -94,8 +97,12 @@ const Empleado = () => {
       await axios.post("http://localhost:5000/api/empleados", { ...nuevoEmpleado, usuario_email: usuarioActivo.correo });
       alert("Empleado agregado correctamente");
       setNuevoEmpleado({ nombre: "", DNI: "", correo: "", telefono: "", direccion: "", id_estado: "", id_clinica: "", foto: null });
-      obtenerEmpleados(); setMostrarFormulario(false);
-    } catch (error) { alert("Error al agregar empleado: " + error.response?.data?.error); console.error(error); }
+      obtenerEmpleados(); 
+      setMostrarFormulario(false);
+    } catch (error) { 
+      alert("Error al agregar empleado: " + error.response?.data?.error); 
+      console.error(error); 
+    }
   };
 
   const actualizarEmpleado = async () => {
@@ -107,8 +114,12 @@ const Empleado = () => {
         { id_estado: Number(empleadoEditando.id_estado), id_clinica: Number(empleadoEditando.id_clinica), usuario_email: usuarioActivo.correo, foto: empleadoEditando.foto }
       );
       alert("Empleado actualizado correctamente");
-      setEmpleadoEditando(null); obtenerEmpleados();
-    } catch (error) { alert(error.response?.data?.error || "Error al actualizar empleado"); console.error(error); }
+      setEmpleadoEditando(null); 
+      obtenerEmpleados();
+    } catch (error) { 
+      alert(error.response?.data?.error || "Error al actualizar empleado"); 
+      console.error(error); 
+    }
   };
 
   const eliminarEmpleado = async (id) => {
@@ -117,12 +128,14 @@ const Empleado = () => {
       const res = await axios.delete(`http://localhost:5000/api/empleados/${id}`, { data: { usuario_email: usuarioActivo.correo } });
       alert(res.data.message || "Empleado eliminado correctamente.");
       obtenerEmpleados();
-    } catch (error) { alert(error.response?.data?.error || "Error al eliminar empleado"); console.error(error); }
+    } catch (error) { 
+      alert(error.response?.data?.error || "Error al eliminar empleado"); 
+      console.error(error); 
+    }
   };
 
   const seleccionarEmpleado = (empleado) => setEmpleadoEditando({ ...empleado, estado_text: empleado.estado, clinica_text: empleado.clinica });
 
-  // Filtros y paginación
   const normalizar = (texto) => texto?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() || "";
   const empleadosFiltrados = empleados.filter(e => 
     normalizar(e.nombre).includes(normalizar(filtroNombre)) &&
@@ -135,7 +148,6 @@ const Empleado = () => {
   const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
   const formatFecha = (fecha) => fecha?.split("T")[0] || "";
 
-  // Excel
   const exportarExcel = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/empleados/exportar", { responseType: "blob" });
@@ -154,7 +166,8 @@ const Empleado = () => {
       formData.append("usuario_email", usuarioActivo.correo);
       const res = await axios.post("http://localhost:5000/api/empleados/importar", formData, { headers: { "Content-Type": "multipart/form-data" } });
       alert(res.data.message || "Empleados importados correctamente");
-      setArchivo(null); obtenerEmpleados();
+      setArchivo(null); 
+      obtenerEmpleados();
     } catch (error) { alert("Error al importar archivo Excel"); console.error(error); }
     finally { setCargandoImport(false); }
   };
@@ -170,7 +183,6 @@ const Empleado = () => {
         <button onClick={() => setMostrarFormulario(!mostrarFormulario)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-blue-700">{mostrarFormulario ? "Cancelar" : "Agregar empleado"}</button>
         <button onClick={exportarExcel} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Exportar Excel</button>
 
-        {/* Botón único de importación */}
         <input 
           type="file" 
           accept=".xlsx" 
@@ -192,7 +204,6 @@ const Empleado = () => {
         </button>
       </div>
 
-      {/* Formulario Agregar */}
       {mostrarFormulario && (
         <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-6">
           <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
@@ -208,7 +219,6 @@ const Empleado = () => {
         </div>
       )}
 
-      {/* Formulario Editar */}
       {empleadoEditando && (
         <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
           <h3 className="text-lg font-semibold mb-2">Editar empleado #{empleadoEditando.id_empleado}</h3>
@@ -224,7 +234,6 @@ const Empleado = () => {
         </div>
       )}
 
-      {/* Tabla y filtros */}
       <div className="overflow-x-auto">
         <div className="flex flex-wrap gap-4 mb-4">
           <input type="text" placeholder="Buscar por nombre" value={filtroNombre} onChange={(e)=>setFiltroNombre(e.target.value)} className="p-2 border rounded text-sm"/>
@@ -250,32 +259,36 @@ const Empleado = () => {
             </tr>
           </thead>
           <tbody>
-            {empleadosActuales.length > 0 ? empleadosActuales.map(e => (
-              <tr key={e.id_empleado} className="text-center border-b">
-                <td className="py-1 px-2">
-                  {e.foto ? <img src={`data:image/jpeg;base64,${e.foto}`} alt="Empleado" className="w-20 h-20 rounded-2xl object-cover shadow-md border border-gray-200 mx-auto"/> : <div className="w-20 h-20 bg-gray-300 rounded-2xl shadow-md border border-gray-200 mx-auto"></div>}
-                </td>
-                <td className="py-1 px-2">{e.id_empleado}</td>
-                <td className="py-1 px-2">{e.nombre}</td>
-                <td className="py-1 px-2">{e.DNI}</td>
-                <td className="py-1 px-2">{e.correo}</td>
-                <td className="py-1 px-2">{formatFecha(e.fecha_ingreso)}</td>
-                <td className="py-1 px-2">{e.telefono}</td>
-                <td className="py-1 px-2">{e.direccion}</td>
-                <td className="py-1 px-2">{e.estado}</td>
-                <td className="py-1 px-2">{e.clinica}</td>
-                <td className="py-1 px-2 flex flex-col gap-1 items-center justify-center">
-                  <button onClick={()=>seleccionarEmpleado(e)} className="bg-yellow-400 text-white px-2 py-1 rounded hover:bg-yellow-500 text-xs">Editar</button>
-                  <button onClick={()=>eliminarEmpleado(e.id_empleado)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-xs">Eliminar</button>
-                </td>
-              </tr>
-            )) : (
-              <tr><td colSpan="11" className="text-center py-4 text-gray-500">No se encontraron empleados.</td></tr>
-            )}
-          </tbody>
+  {empleadosActuales.length > 0 ? empleadosActuales.map(e => (
+    <tr key={e.id_empleado} className="text-center border-b">
+      <td className="py-1 px-2">
+        {e.foto 
+          ? <img src={`data:image/jpeg;base64,${e.foto}`} alt="Empleado" className="w-20 h-20 rounded-2xl object-cover shadow-md border border-gray-200 mx-auto"/>
+          : <div className="w-20 h-20 bg-gray-300 rounded-2xl shadow-md border border-gray-200 mx-auto"></div>
+        }
+      </td>
+      <td className="py-1 px-2">{e.id_empleado}</td>
+      <td className="py-1 px-2">{e.nombre}</td>
+      <td className="py-1 px-2">{e.DNI}</td>
+      <td className="py-1 px-2">{e.correo}</td>
+      <td className="py-1 px-2">{formatFecha(e.fecha_ingreso)}</td>
+      <td className="py-1 px-2">{formatFecha(e.fecha_salida)}</td>
+      <td className="py-1 px-2">{e.telefono}</td>
+      <td className="py-1 px-2">{e.direccion}</td>
+      <td className="py-1 px-2">{e.estado}</td>
+      <td className="py-1 px-2">{e.clinica}</td>
+      <td className="py-1 px-2 flex flex-col gap-1 items-center justify-center">
+        <button onClick={()=>seleccionarEmpleado(e)} className="bg-yellow-400 text-white px-2 py-1 rounded hover:bg-yellow-500 text-xs">Editar</button>
+        <button onClick={()=>eliminarEmpleado(e.id_empleado)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-xs">Eliminar</button>
+      </td>
+    </tr>
+  )) : (
+    <tr><td colSpan="12" className="text-center py-4 text-gray-500">No se encontraron empleados.</td></tr>
+  )}
+</tbody>
+
         </table>
 
-        {/* Paginación */}
         <div className="flex justify-center mt-4 gap-2">
           <button disabled={paginaActual === 1} onClick={()=>setPaginaActual(paginaActual-1)} className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400">Anterior</button>
           <span className="px-2 py-1">{paginaActual} / {totalPaginas}</span>

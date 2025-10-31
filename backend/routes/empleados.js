@@ -26,39 +26,69 @@ if (!fs.existsSync(path.join(process.cwd(), "uploads"))) {
   fs.mkdirSync(path.join(process.cwd(), "uploads"));
 }
 
-// ============================
-// OBTENER TODOS LOS EMPLEADOS
-// ============================
+const cellToString = (v) => {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "object") {
+    if (v.text) return String(v.text).trim();
+    if (v.richText && Array.isArray(v.richText))
+      return v.richText.map((r) => r.text).join("").trim();
+    if (v.result) return String(v.result).trim();
+    if (v instanceof Date) return v.toISOString();
+    return JSON.stringify(v);
+  }
+  return String(v).trim();
+};
+
 router.get("/", async (req, res) => {
   try {
     const pool = await connectDB();
-    pool.config.requestTimeout = 30000; // 30 segundos para evitar ETIMEOUT
-    const result = await pool.request().query(`
+    pool.config.requestTimeout = 30000;
+
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const request = pool.request();
+    request.input("offset", sql.Int, offset);
+    request.input("limit", sql.Int, limit);
+
+    const result = await request.query(`
       SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso,
-             e.telefono, e.direccion, e.foto,
+             e.telefono, e.direccion,
              c.nombre_clinica AS clinica,
              est.descripcion AS estado,
-             e.fecha_salida
+             e.fecha_salida,
+             e.foto
       FROM Empleado e
       INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
       INNER JOIN Estado_empleado est ON e.id_estado = est.id_estado
+      ORDER BY e.id_empleado
+      OFFSET @offset ROWS
+      FETCH NEXT @limit ROWS ONLY
     `);
+
 
     const empleados = result.recordset.map(emp => ({
       ...emp,
-      foto: emp.foto ? emp.foto.toString("base64") : null
+      foto: emp.foto ? Buffer.from(emp.foto).toString("base64") : null
     }));
 
-    res.json(empleados);
+    const totalResult = await pool.request().query("SELECT COUNT(*) AS total FROM Empleado");
+    const total = totalResult.recordset[0].total ?? 0;
+
+    res.json({
+      empleados,
+      total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
-    console.error("Error al obtener empleados:", err);
+    console.error("❌ Error al obtener empleados:", err);
     res.status(500).json({ error: "Error al obtener empleados" });
   }
 });
 
-// ============================
-// OBTENER LISTA DE ESTADOS
-// ============================
+
 router.get("/estados/lista", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -71,9 +101,7 @@ router.get("/estados/lista", async (req, res) => {
   }
 });
 
-// ============================
-// OBTENER LISTA DE CLÍNICAS
-// ============================
+
 router.get("/clinicas/lista", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -86,9 +114,7 @@ router.get("/clinicas/lista", async (req, res) => {
   }
 });
 
-// ============================
-// AGREGAR EMPLEADO
-// ============================
+
 router.post("/", async (req, res) => {
   const { nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, usuario_email, foto } = req.body;
 
@@ -103,11 +129,11 @@ router.post("/", async (req, res) => {
 
     const insertResult = await pool
       .request()
-      .input("nombre", sql.VarChar, nombre)
-      .input("DNI", sql.VarChar, DNI)
-      .input("correo", sql.VarChar, correo)
-      .input("telefono", sql.VarChar, telefono || "")
-      .input("direccion", sql.VarChar, direccion || "")
+      .input("nombre", sql.VarChar, String(nombre))
+      .input("DNI", sql.VarChar, String(DNI))
+      .input("correo", sql.VarChar, String(correo))
+      .input("telefono", sql.VarChar, String(telefono || ""))
+      .input("direccion", sql.VarChar, String(direccion || ""))
       .input("id_estado", sql.Int, Number(id_estado))
       .input("id_clinica", sql.Int, Number(id_clinica))
       .input("foto", sql.VarBinary(sql.MAX), fotoBuffer)
@@ -121,7 +147,7 @@ router.post("/", async (req, res) => {
 
     const usuarioResult = await pool
       .request()
-      .input("correo", sql.VarChar, usuario_email)
+      .input("correo", sql.VarChar, String(usuario_email))
       .query("SELECT id_empleado, nombre FROM Empleado WHERE correo = @correo");
 
     if (usuarioResult.recordset.length === 0)
@@ -147,9 +173,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ============================
-// ACTUALIZAR EMPLEADO
-// ============================
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
   const { id_estado, id_clinica, usuario_email, foto } = req.body;
@@ -223,7 +246,7 @@ router.put("/:id", async (req, res) => {
 
     const usuarioResult = await pool
       .request()
-      .input("correo", sql.VarChar, usuario_email)
+      .input("correo", sql.VarChar, String(usuario_email))
       .query("SELECT id_empleado, nombre FROM Empleado WHERE correo = @correo");
 
     if (usuarioResult.recordset.length === 0)
@@ -253,9 +276,6 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// ============================
-// ELIMINAR EMPLEADO
-// ============================
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   const { usuario_email } = req.body;
@@ -282,7 +302,7 @@ router.delete("/:id", async (req, res) => {
 
     const usuarioResult = await pool
       .request()
-      .input("correo", sql.VarChar, usuario_email)
+      .input("correo", sql.VarChar, String(usuario_email))
       .query("SELECT id_empleado, nombre FROM Empleado WHERE correo = @correo");
 
     if (usuarioResult.recordset.length === 0)
@@ -310,16 +330,13 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// ============================
-// EXPORTAR EXCEL
-// ============================
 router.get("/exportar", async (req, res) => {
   try {
     const pool = await connectDB();
     pool.config.requestTimeout = 30000;
 
     const result = await pool.request().query(`
-      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso,
+      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
              e.telefono, e.direccion,
              c.nombre_clinica AS clinica,
              est.descripcion AS estado
@@ -339,6 +356,7 @@ router.get("/exportar", async (req, res) => {
       { header: "DNI", key: "DNI", width: 15 },
       { header: "Correo", key: "correo", width: 25 },
       { header: "Fecha Ingreso", key: "fecha_ingreso", width: 15 },
+      { header: "Fecha Salida", key: "fecha_salida", width: 15 },
       { header: "Teléfono", key: "telefono", width: 15 },
       { header: "Dirección", key: "direccion", width: 25 },
       { header: "Estado", key: "estado", width: 15 },
@@ -351,7 +369,8 @@ router.get("/exportar", async (req, res) => {
         nombre: emp.nombre,
         DNI: emp.DNI,
         correo: emp.correo,
-        fecha_ingreso: emp.fecha_ingreso,
+        fecha_ingreso: emp.fecha_ingreso ? emp.fecha_ingreso.toISOString().split("T")[0] : "",
+        fecha_salida: emp.fecha_salida ? emp.fecha_salida.toISOString().split("T")[0] : "",
         telefono: emp.telefono,
         direccion: emp.direccion,
         estado: emp.estado,
@@ -376,62 +395,70 @@ router.get("/exportar", async (req, res) => {
   }
 });
 
-// ============================
-// IMPORTAR EXCEL (Corregido con await y validación)
-// ============================
+
 router.post("/importar", upload.single("archivo"), async (req, res) => {
   const { usuario_email } = req.body;
   if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo" });
   if (!usuario_email) return res.status(400).json({ error: "Falta usuario_email" });
 
+  const filePath = req.file.path;
+
   try {
     const pool = await connectDB();
-    pool.config.requestTimeout = 60000; // 60s por seguridad
+    pool.config.requestTimeout = 60000;
 
-    const filePath = req.file.path;
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
     const worksheet = workbook.getWorksheet(1);
     const empleadosAgregados = [];
 
-    // Obtener usuario actual (para registro)
+  
     const usuarioResult = await pool
       .request()
-      .input("correo", sql.VarChar, usuario_email)
+      .input("correo", sql.VarChar, String(usuario_email))
       .query("SELECT id_empleado, nombre FROM Empleado WHERE correo = @correo");
 
     if (usuarioResult.recordset.length === 0) {
-      fs.unlinkSync(filePath);
+      try { fs.unlinkSync(filePath); } catch (e) {}
       return res.status(404).json({ error: "Usuario activo no encontrado" });
     }
-
     const usuarioActual = usuarioResult.recordset[0];
 
-    // Se salta la primera fila (encabezados)
     for (let i = 2; i <= worksheet.rowCount; i++) {
       const row = worksheet.getRow(i);
-      const nombre = row.getCell(1).value;
-      const DNI = row.getCell(2).value;
-      const correo = row.getCell(3).value;
-      const telefono = row.getCell(4).value || "";
-      const direccion = row.getCell(5).value || "";
-      const id_estado = row.getCell(6).value;
-      const id_clinica = row.getCell(7).value;
+
+      const nombre = cellToString(row.getCell(1).value);
+      const DNI = cellToString(row.getCell(2).value);
+      const correo = cellToString(row.getCell(3).value);
+      const fechaIngresoRaw = row.getCell(4).value;
+      const fechaSalidaRaw = row.getCell(5).value;
+      const telefono = cellToString(row.getCell(6).value || "");
+      const direccion = cellToString(row.getCell(7).value || "");
+      const id_estado = Number(row.getCell(8).value);
+      const id_clinica = Number(row.getCell(9).value);
 
       if (!nombre || !DNI || !correo || !id_estado || !id_clinica) continue;
 
-      // Validar duplicados por correo o DNI
       const existe = await pool
         .request()
         .input("DNI", sql.VarChar, DNI)
         .input("correo", sql.VarChar, correo)
-        .query(`
-          SELECT COUNT(*) AS existe
-          FROM Empleado
-          WHERE DNI = @DNI OR correo = @correo
-        `);
+        .query(`SELECT COUNT(*) AS existe FROM Empleado WHERE DNI = @DNI OR correo = @correo`);
 
       if (existe.recordset[0].existe > 0) continue;
+
+      let fecha_ingreso = null;
+      let fecha_salida = null;
+
+      if (fechaIngresoRaw) {
+        if (fechaIngresoRaw instanceof Date) fecha_ingreso = fechaIngresoRaw;
+        else fecha_ingreso = new Date(cellToString(fechaIngresoRaw));
+      }
+
+      if (fechaSalidaRaw) {
+        if (fechaSalidaRaw instanceof Date) fecha_salida = fechaSalidaRaw;
+        else fecha_salida = new Date(cellToString(fechaSalidaRaw));
+      }
 
       const insertResult = await pool
         .request()
@@ -440,11 +467,14 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
         .input("correo", sql.VarChar, correo)
         .input("telefono", sql.VarChar, telefono)
         .input("direccion", sql.VarChar, direccion)
-        .input("id_estado", sql.Int, Number(id_estado))
-        .input("id_clinica", sql.Int, Number(id_clinica))
+        .input("id_estado", sql.Int, id_estado)
+        .input("id_clinica", sql.Int, id_clinica)
+        .input("fecha_ingreso", sql.Date, fecha_ingreso)
+        .input("fecha_salida", sql.Date, fecha_salida)
         .query(`
-          INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, fecha_ingreso)
-          VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, GETDATE());
+          INSERT INTO Empleado 
+          (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, fecha_ingreso, fecha_salida)
+          VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @fecha_ingreso, @fecha_salida);
           SELECT SCOPE_IDENTITY() AS id_empleado;
         `);
 
@@ -464,18 +494,20 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
       empleadosAgregados.push({ id_empleado: nuevoEmpleadoId, nombre });
     }
 
-    fs.unlinkSync(filePath);
+    try { fs.unlinkSync(filePath); } catch (e) {}
+
     res.json({
       success: true,
       message: `Se importaron ${empleadosAgregados.length} empleados correctamente`,
       empleados: empleadosAgregados,
     });
+
   } catch (err) {
     console.error("Error al importar Excel:", err);
+    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
     res.status(500).json({ error: "Error al importar Excel" });
   }
 });
-
 
 
 export default router;
