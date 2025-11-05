@@ -4,17 +4,18 @@ const dbConfig = {
   user: "appuser",
   password: "12345",
   server: "OSCAR-MACOTO-HN01",
+  port: 1433,
   database: "RRHH",
   options: {
-    encrypt: false, 
+    encrypt: false,
     trustServerCertificate: true,
   },
   pool: {
-    max: 10,              
-    min: 0,               
-    idleTimeoutMillis: 30000, 
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000,
   },
-  requestTimeout: 30000,  
+  requestTimeout: 30000,
 };
 
 let poolGlobal = null;
@@ -23,7 +24,6 @@ export async function connectDB() {
   try {
     if (poolGlobal) {
       if (poolGlobal.connected) return poolGlobal;
-
       await poolGlobal.connect();
       return poolGlobal;
     }
@@ -32,7 +32,7 @@ export async function connectDB() {
 
     poolGlobal.on("error", (err) => {
       console.error("Error en el pool SQL:", err);
-      poolGlobal = null; 
+      poolGlobal = null;
     });
 
     await poolGlobal.connect();

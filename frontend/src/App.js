@@ -3,6 +3,7 @@ import { MsalProvider, useIsAuthenticated, useMsal } from "@azure/msal-react";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { useState, useEffect } from "react";
 
+import Logs from "./pages/Logs.jsx";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import Empleados from "./pages/Empleados";
@@ -80,6 +81,7 @@ function AppContent() {
           <Route path="/estados" element={<Estados />} />
           <Route path="/sso" element={<SSO />} />
           <Route path="/selfservice" element={<SelfService />} />
+          <Route path="/logs" element={<Logs />} /> {/* <-- Ruta de logs */}
         </Routes>
       </main>
     </div>

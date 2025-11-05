@@ -8,6 +8,7 @@ import fs from "fs";
 
 const router = express.Router();
 
+// Configuración de multer para subir archivos Excel
 const upload = multer({
   dest: path.join(process.cwd(), "uploads"),
   fileFilter: (req, file, cb) => {
@@ -26,6 +27,7 @@ if (!fs.existsSync(path.join(process.cwd(), "uploads"))) {
   fs.mkdirSync(path.join(process.cwd(), "uploads"));
 }
 
+// Convierte cualquier celda de Excel a string
 const cellToString = (v) => {
   if (v === null || v === undefined) return "";
   if (typeof v === "object") {
@@ -39,6 +41,7 @@ const cellToString = (v) => {
   return String(v).trim();
 };
 
+//GET EMPLEADOS + PAGINACIOM
 router.get("/", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -67,7 +70,6 @@ router.get("/", async (req, res) => {
       FETCH NEXT @limit ROWS ONLY
     `);
 
-
     const empleados = result.recordset.map(emp => ({
       ...emp,
       foto: emp.foto ? Buffer.from(emp.foto).toString("base64") : null
@@ -83,12 +85,12 @@ router.get("/", async (req, res) => {
       totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
-    console.error("❌ Error al obtener empleados:", err);
+    console.error("Error al obtener empleados:", err);
     res.status(500).json({ error: "Error al obtener empleados" });
   }
 });
 
-
+// GET ESTADOS
 router.get("/estados/lista", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -101,7 +103,7 @@ router.get("/estados/lista", async (req, res) => {
   }
 });
 
-
+// GET CLINICAS
 router.get("/clinicas/lista", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -114,7 +116,7 @@ router.get("/clinicas/lista", async (req, res) => {
   }
 });
 
-
+// ADD EMPLEADOS
 router.post("/", async (req, res) => {
   const { nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, usuario_email, foto } = req.body;
 
@@ -173,6 +175,7 @@ router.post("/", async (req, res) => {
   }
 });
 
+// UDPDATE EMPLEADO
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
   const { id_estado, id_clinica, usuario_email, foto } = req.body;
@@ -215,25 +218,17 @@ router.put("/:id", async (req, res) => {
     const nuevoEstadoDesc = (estadoNuevo.recordset[0]?.descripcion || "").trim().toLowerCase();
 
     let fechaSalidaClause = "";
-    if (["despedido", "renuncia"].includes(nuevoEstadoDesc)) {
-      fechaSalidaClause = "fecha_salida = GETDATE()";
-    } else if (["activo", "on leave", "onleave"].includes(nuevoEstadoDesc)) {
-      fechaSalidaClause = "fecha_salida = NULL";
-    }
+    if (["despedido", "renuncia"].includes(nuevoEstadoDesc)) fechaSalidaClause = "fecha_salida = GETDATE()";
+    else if (["activo", "on leave", "onleave"].includes(nuevoEstadoDesc)) fechaSalidaClause = "fecha_salida = NULL";
 
     const fotoBuffer = foto ? Buffer.from(foto, "base64") : null;
-
     const updates = [];
     if (fechaSalidaClause) updates.push(fechaSalidaClause);
     updates.push("id_estado = @id_estado");
     updates.push("id_clinica = @id_clinica");
     if (fotoBuffer) updates.push("foto = @foto");
 
-    const updateQuery = `
-      UPDATE Empleado
-      SET ${updates.join(", ")}
-      WHERE id_empleado = @id
-    `;
+    const updateQuery = `UPDATE Empleado SET ${updates.join(", ")} WHERE id_empleado = @id`;
 
     const request = pool.request()
       .input("id_estado", sql.Int, id_estado)
@@ -241,7 +236,6 @@ router.put("/:id", async (req, res) => {
       .input("id", sql.Int, id);
 
     if (fotoBuffer) request.input("foto", sql.VarBinary(sql.MAX), fotoBuffer);
-
     await request.query(updateQuery);
 
     const usuarioResult = await pool
@@ -276,6 +270,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// DELETE EMPLEADO
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   const { usuario_email } = req.body;
@@ -330,6 +325,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// EXPORT EMPLEADOS EXCEL
 router.get("/exportar", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -395,7 +391,7 @@ router.get("/exportar", async (req, res) => {
   }
 });
 
-
+// IMPORT EMPLEADOS EXCEL
 router.post("/importar", upload.single("archivo"), async (req, res) => {
   const { usuario_email } = req.body;
   if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo" });
@@ -412,7 +408,6 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
     const worksheet = workbook.getWorksheet(1);
     const empleadosAgregados = [];
 
-  
     const usuarioResult = await pool
       .request()
       .input("correo", sql.VarChar, String(usuario_email))
@@ -450,15 +445,8 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
       let fecha_ingreso = null;
       let fecha_salida = null;
 
-      if (fechaIngresoRaw) {
-        if (fechaIngresoRaw instanceof Date) fecha_ingreso = fechaIngresoRaw;
-        else fecha_ingreso = new Date(cellToString(fechaIngresoRaw));
-      }
-
-      if (fechaSalidaRaw) {
-        if (fechaSalidaRaw instanceof Date) fecha_salida = fechaSalidaRaw;
-        else fecha_salida = new Date(cellToString(fechaSalidaRaw));
-      }
+      if (fechaIngresoRaw) fecha_ingreso = fechaIngresoRaw instanceof Date ? fechaIngresoRaw : new Date(cellToString(fechaIngresoRaw));
+      if (fechaSalidaRaw) fecha_salida = fechaSalidaRaw instanceof Date ? fechaSalidaRaw : new Date(cellToString(fechaSalidaRaw));
 
       const insertResult = await pool
         .request()
@@ -491,23 +479,17 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
           VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
         `);
 
-      empleadosAgregados.push({ id_empleado: nuevoEmpleadoId, nombre });
+      empleadosAgregados.push(nombre);
     }
 
     try { fs.unlinkSync(filePath); } catch (e) {}
 
-    res.json({
-      success: true,
-      message: `Se importaron ${empleadosAgregados.length} empleados correctamente`,
-      empleados: empleadosAgregados,
-    });
-
+    res.json({ success: true, message: `Empleados importados correctamente: ${empleadosAgregados.join(", ")}` });
   } catch (err) {
     console.error("Error al importar Excel:", err);
-    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
+    try { fs.unlinkSync(filePath); } catch (e) {}
     res.status(500).json({ error: "Error al importar Excel" });
   }
 });
-
 
 export default router;

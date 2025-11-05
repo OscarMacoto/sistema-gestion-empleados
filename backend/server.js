@@ -3,6 +3,7 @@ import cors from "cors";
 import sql from "mssql";
 import { connectDB } from "./db.js";
 
+import logsRoutes from "./routes/logs.js";
 import empleadosRoutes from "./routes/empleados.js";
 import clinicasRoutes from "./routes/clinicas.js";
 import estadosRoutes from "./routes/estados.js";
@@ -11,16 +12,19 @@ import ssoRoutes from "./routes/sso.js";
 const app = express();
 const PORT = 5000;
 
+// Middlewares
+app.use(cors({ origin: "http://localhost:3000" })); // Debe ir primero
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-app.use(cors({ origin: "http://localhost:3000" }));
-
+// Rutas
+app.use("/api/logs", logsRoutes);
 app.use("/api/empleados", empleadosRoutes);
 app.use("/api/clinicas", clinicasRoutes);
 app.use("/api/estados", estadosRoutes);
 app.use("/api/sso", ssoRoutes);
 
+// GET EMPLEADO POR CORREO 
 app.get("/api/empleados/email/:correo", async (req, res) => {
   try {
     const correo = req.params.correo;
@@ -36,6 +40,8 @@ app.get("/api/empleados/email/:correo", async (req, res) => {
           e.fecha_ingreso, 
           e.telefono, 
           e.direccion,
+          e.id_estado,        
+          e.id_clinica,       
           c.nombre_clinica AS clinica, 
           est.descripcion AS estado
         FROM Empleado e
@@ -55,6 +61,7 @@ app.get("/api/empleados/email/:correo", async (req, res) => {
   }
 });
 
+// ACTUALIZACION DEL L.LOGIN
 app.post("/api/sso/actualizar-login", async (req, res) => {
   try {
     const { id_empleado } = req.body;
@@ -78,6 +85,7 @@ app.post("/api/sso/actualizar-login", async (req, res) => {
   }
 });
 
+// INIT SERVER
 (async () => {
   try {
     await connectDB();

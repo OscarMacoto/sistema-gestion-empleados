@@ -10,11 +10,12 @@ function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-white shadow-md p-4">
+    <aside className="w-64 bg-white shadow-md p-4 flex flex-col h-screen">
       <div className="mb-6 text-center">
         <img src={logo} alt="Logo" className="mx-auto h-12 mb-2" />
         <h1 className="text-lg font-bold">Gestión Empleados</h1>
       </div>
+
       <nav className="space-y-2 flex-1">
         <Link to="/" className="block p-2 rounded hover:bg-blue-100 text-center">
           Empleados
@@ -28,9 +29,14 @@ function Sidebar() {
         <Link to="/sso" className="block p-2 rounded hover:bg-blue-100 text-center">
           SSO Microsoft
         </Link>
-        <Link to="/selfservice" className="block p-2 rounded hover:bg-blue-100 text-center"> 
-           Self-Service </Link> 
+        <Link to="/selfservice" className="block p-2 rounded hover:bg-blue-100 text-center">
+          Self-Service
+        </Link>
+        <Link to="/logs" className="block p-2 rounded hover:bg-blue-100 text-center">
+          Logs de Acciones
+        </Link>
       </nav>
+
       <div className="mt-6 text-center">
         {accounts.length > 0 && (
           <>
