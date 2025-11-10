@@ -52,7 +52,6 @@ const RegistroAcciones = () => {
     <div className="p-4">
       <h2 className="text-2xl font-bold text-center mb-6">Registro de Acciones</h2>
 
-      {/* Filtros de fecha */}
       <div className="flex flex-wrap gap-2 mb-4 items-end">
         <div>
           <label className="block text-sm font-medium mb-1">Fecha inicio:</label>
@@ -95,7 +94,6 @@ const RegistroAcciones = () => {
             </tbody>
           </table>
 
-          {/* Paginación */}
           <div className="flex justify-center mt-4 gap-2">
             <button disabled={paginaActual === 1} onClick={()=>setPaginaActual(paginaActual-1)} className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400">Anterior</button>
             <span className="px-2 py-1">{paginaActual} / {totalPaginas}</span>

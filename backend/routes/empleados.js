@@ -8,7 +8,6 @@ import fs from "fs";
 
 const router = express.Router();
 
-// Configuración de multer para subir archivos Excel
 const upload = multer({
   dest: path.join(process.cwd(), "uploads"),
   fileFilter: (req, file, cb) => {
@@ -27,7 +26,6 @@ if (!fs.existsSync(path.join(process.cwd(), "uploads"))) {
   fs.mkdirSync(path.join(process.cwd(), "uploads"));
 }
 
-// Convierte cualquier celda de Excel a string
 const cellToString = (v) => {
   if (v === null || v === undefined) return "";
   if (typeof v === "object") {
@@ -41,7 +39,6 @@ const cellToString = (v) => {
   return String(v).trim();
 };
 
-//GET EMPLEADOS + PAGINACIOM
 router.get("/", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -90,7 +87,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET ESTADOS
 router.get("/estados/lista", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -103,7 +99,6 @@ router.get("/estados/lista", async (req, res) => {
   }
 });
 
-// GET CLINICAS
 router.get("/clinicas/lista", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -116,7 +111,6 @@ router.get("/clinicas/lista", async (req, res) => {
   }
 });
 
-// ADD EMPLEADOS
 router.post("/", async (req, res) => {
   const { nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, usuario_email, foto } = req.body;
 
@@ -175,7 +169,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// UDPDATE EMPLEADO
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
   const { id_estado, id_clinica, usuario_email, foto } = req.body;
@@ -270,7 +263,6 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE EMPLEADO
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   const { usuario_email } = req.body;
@@ -325,7 +317,6 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// EXPORT EMPLEADOS EXCEL
 router.get("/exportar", async (req, res) => {
   try {
     const pool = await connectDB();
@@ -391,7 +382,6 @@ router.get("/exportar", async (req, res) => {
   }
 });
 
-// IMPORT EMPLEADOS EXCEL
 router.post("/importar", upload.single("archivo"), async (req, res) => {
   const { usuario_email } = req.body;
   if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo" });

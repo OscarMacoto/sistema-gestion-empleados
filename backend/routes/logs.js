@@ -4,7 +4,6 @@ import ExcelJS from "exceljs";
 
 const router = express.Router(); 
 
-// GET LOGS FILTRADOS
 router.get("/", async (req, res) => {
   let { desde, hasta } = req.query;
 
@@ -36,7 +35,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// EXPORT LOGS A EXCEL
 router.get("/exportar", async (req, res) => {
   let { desde, hasta } = req.query;
 
