@@ -291,24 +291,39 @@ const eliminarEmpleado = async (id) => {
   // EXPORTAR / IMPORTAR 
 
   const exportarExcel = async () => {
-    try {
-      const empleadosSinFoto = empleados.map(({ foto, ...resto }) => resto);
-      const res = await axios.post("http://localhost:5000/api/empleados/exportar", empleadosSinFoto, {
+  try {
+    const empleadosSinFoto = empleados.map(({ foto, ...resto }) => resto);
+    const res = await axios.post(
+      "http://localhost:5000/api/empleados/exportar",
+      empleadosSinFoto,
+      {
         responseType: "blob",
         headers: { "Content-Type": "application/json" },
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "empleados.xlsx");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error("Error al exportar Excel:", error);
-      alert("No se pudo exportar el archivo. Verifica que la ruta exista en backend.");
-    }
-  };
+      }
+    );
+
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "empleados.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    await axios.post("http://localhost:5000/api/empleados/registrarAccion", {
+      usuario_email: usuarioActivo.correo,
+      accion: "Exportar Excel",
+      detalles: `El usuario ${usuarioActivo.nombre} exportó la lista de empleados`,
+    });
+
+    console.log("Acción registrada correctamente.");
+
+  } catch (error) {
+    console.error("Error al exportar Excel:", error);
+    alert("No se pudo exportar o registrar la acción.");
+  }
+};
+
 
   const importarExcel = async (file) => {
     if (!file) return alert("Selecciona un archivo primero.");
