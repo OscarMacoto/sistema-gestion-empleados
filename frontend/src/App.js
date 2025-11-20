@@ -12,6 +12,17 @@ import Estados from "./pages/Estados";
 import SSO from "./pages/SSO";
 import SelfService from "./pages/SelfService";
 import LoginMicrosoft from "./components/LoginMicrosoft";
+import ProtectedRoute from "./components/ProtectedRoute";
+
+function AccesoDenegado() {
+  return (
+    <div className="flex items-center justify-center h-screen bg-gray-100">
+      <h1 className="text-3xl font-bold text-red-600">
+        Acceso Denegado
+      </h1>
+    </div>
+  );
+}
 
 const msalConfig = {
   auth: {
@@ -30,6 +41,7 @@ function AppContent() {
 
   const handleLogout = () => {
     instance.logoutPopup({ postLogoutRedirectUri: window.location.origin });
+    localStorage.removeItem("usuario_rol");
   };
 
   useEffect(() => {
@@ -76,12 +88,61 @@ function AppContent() {
           Cerrar sesión
         </button>
         <Routes>
-          <Route path="/" element={<Empleados />} />
-          <Route path="/clinicas" element={<Clinicas />} />
-          <Route path="/estados" element={<Estados />} />
-          <Route path="/sso" element={<SSO />} />
-          <Route path="/selfservice" element={<SelfService />} />
-          <Route path="/logs" element={<Logs />} /> {/* <-- Ruta de logs */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute rolesPermitidos={["Administrador", "RRHH"]}>
+                <Empleados />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/clinicas"
+            element={
+              <ProtectedRoute rolesPermitidos={["Administrador", "RRHH"]}>
+                <Clinicas />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/estados"
+            element={
+              <ProtectedRoute rolesPermitidos={["Administrador", "RRHH"]}>
+                <Estados />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/sso"
+            element={
+              <ProtectedRoute rolesPermitidos={["Administrador", "RRHH"]}>
+                <SSO />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/selfservice"
+            element={
+              <ProtectedRoute>
+                <SelfService />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/logs"
+            element={
+              <ProtectedRoute rolesPermitidos={["Administrador"]}>
+                <Logs />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/acceso-denegado" element={<AccesoDenegado />} />
         </Routes>
       </main>
     </div>

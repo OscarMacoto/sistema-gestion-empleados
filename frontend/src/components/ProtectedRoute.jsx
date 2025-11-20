@@ -1,11 +1,21 @@
 import { Navigate } from "react-router-dom";
-import { useIsAuthenticated } from "@azure/msal-react";
 
-const ProtectedRoute = ({ children }) => {
-  const isAuthenticated = useIsAuthenticated();
+const ProtectedRoute = ({ children, rolesPermitidos }) => {
+  const rolUsuario = localStorage.getItem("usuario_rol");
 
-  if (!isAuthenticated) {
-    return <Navigate to="/" replace />;
+  // Si NO hay login MSAL no entra al sistema
+  if (!rolUsuario) {
+    return <Navigate to="/acceso-denegado" />;
+  }
+
+  // Si no se especifican roles acceso libre para usuarios autenticados
+  if (!rolesPermitidos) {
+    return children;
+  }
+
+  // Si el rol NO coincide acceso denegado
+  if (!rolesPermitidos.includes(rolUsuario)) {
+    return <Navigate to="/acceso-denegado" />;
   }
 
   return children;

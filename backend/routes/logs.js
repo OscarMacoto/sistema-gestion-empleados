@@ -4,8 +4,13 @@ import ExcelJS from "exceljs";
 
 const router = express.Router(); 
 
+const parseDesde = (fechaStr) => fechaStr ? new Date(new Date(fechaStr).setHours(0, 0, 0, 0)) : null;
+const parseHasta = (fechaStr) => fechaStr ? new Date(new Date(fechaStr).setHours(23, 59, 59, 999)) : null;
+
+// GET /logs
+
 router.get("/", async (req, res) => {
-  let { desde, hasta } = req.query;
+  const { desde, hasta } = req.query;
 
   try {
     const pool = await connectDB();
@@ -17,11 +22,14 @@ router.get("/", async (req, res) => {
     const request = pool.request();
 
     if (desde) {
-      request.input("desde", sql.DateTime, desde);
+      const fechaDesde = parseDesde(desde);
+      request.input("desde", sql.DateTime2, fechaDesde);
       query += " AND fecha >= @desde";
     }
+
     if (hasta) {
-      request.input("hasta", sql.DateTime, hasta);
+      const fechaHasta = parseHasta(hasta);
+      request.input("hasta", sql.DateTime2, fechaHasta);
       query += " AND fecha <= @hasta";
     }
 
@@ -35,8 +43,10 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /logs/
+
 router.get("/exportar", async (req, res) => {
-  let { desde, hasta } = req.query;
+  const { desde, hasta } = req.query;
 
   try {
     const pool = await connectDB();
@@ -48,11 +58,14 @@ router.get("/exportar", async (req, res) => {
     const request = pool.request();
 
     if (desde) {
-      request.input("desde", sql.DateTime, desde);
+      const fechaDesde = parseDesde(desde);
+      request.input("desde", sql.DateTime2, fechaDesde);
       query += " AND fecha >= @desde";
     }
+
     if (hasta) {
-      request.input("hasta", sql.DateTime, hasta);
+      const fechaHasta = parseHasta(hasta);
+      request.input("hasta", sql.DateTime2, fechaHasta);
       query += " AND fecha <= @hasta";
     }
 
@@ -60,6 +73,7 @@ router.get("/exportar", async (req, res) => {
 
     const result = await request.query(query);
 
+    // Crear Excel
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Logs");
 
@@ -72,7 +86,7 @@ router.get("/exportar", async (req, res) => {
       { header: "Detalles", key: "detalles", width: 50 },
     ];
 
-    result.recordset.forEach((row) => sheet.addRow(row));
+    result.recordset.forEach(row => sheet.addRow(row));
 
     res.setHeader(
       "Content-Type",

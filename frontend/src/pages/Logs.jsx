@@ -66,7 +66,7 @@ const Logs = () => {
 
         <button
           onClick={obtenerLogs}
-          className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 transition"
+          className="bg-gray-300 text-black px-4 py-1 rounded hover:bg-blue-700 transition"
         >
           Filtrar
         </button>
@@ -84,7 +84,7 @@ const Logs = () => {
         <p>Cargando...</p>
       ) : (
         <table className="table-auto border-collapse border border-gray-300 w-full text-left">
-          <thead className="bg-blue-600 text-white">
+          <thead className="bg-gray-300 text-black">
             <tr>
               <th className="px-3 py-2">ID Registro</th>
               <th className="px-3 py-2">ID Empleado</th>

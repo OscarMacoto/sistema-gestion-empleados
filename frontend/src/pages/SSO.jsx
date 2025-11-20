@@ -34,7 +34,7 @@ function SSO() {
       />
 
       <table className="min-w-full border border-gray-300 rounded-lg">
-        <thead className="bg-blue-600 text-white text-center">
+        <thead className="bg-gray-300 text-Black text-center">
           <tr>
             <th className="py-2 px-4">ID Empleado</th>
             <th className="py-2 px-4">Nombre</th>

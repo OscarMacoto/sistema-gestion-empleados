@@ -7,7 +7,6 @@ import path from "path";
 import fs from "fs";
 
 const router = express.Router();
-
 const upload = multer({
   dest: path.join(process.cwd(), "uploads"),
   fileFilter: (req, file, cb) => {
@@ -22,6 +21,7 @@ const upload = multer({
     }
   },
 });
+
 if (!fs.existsSync(path.join(process.cwd(), "uploads"))) {
   fs.mkdirSync(path.join(process.cwd(), "uploads"));
 }
@@ -39,62 +39,74 @@ const cellToString = (v) => {
   return String(v).trim();
 };
 
-router.get("/", async (req, res) => {
-  try {
-    const pool = await connectDB();
-    pool.config.requestTimeout = 30000;
-
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
-    const offset = (page - 1) * limit;
-
-    const request = pool.request();
-    request.input("offset", sql.Int, offset);
-    request.input("limit", sql.Int, limit);
-
-    const result = await request.query(`
-      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso,
-             e.telefono, e.direccion,
-             c.nombre_clinica AS clinica,
-             est.descripcion AS estado,
-             e.fecha_salida,
-             e.foto
+async function getUsuarioByEmail(pool, correo) {
+  if (!correo) return null;
+  const result = await pool
+    .request()
+    .input("correo", sql.VarChar, String(correo))
+    .query(`
+      SELECT e.id_empleado, e.nombre, e.id_rol, r.descripcion AS rol_descripcion
       FROM Empleado e
-      INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
-      INNER JOIN Estado_empleado est ON e.id_estado = est.id_estado
-      ORDER BY e.id_empleado
-      OFFSET @offset ROWS
-      FETCH NEXT @limit ROWS ONLY
+      LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
+      WHERE e.correo = @correo
     `);
+  return result.recordset[0] ?? null;
+}
 
-    const empleados = result.recordset.map(emp => ({
-      ...emp,
-      foto: emp.foto ? Buffer.from(emp.foto).toString("base64") : null
-    }));
+async function verificarRoles(pool, usuario_email, allowed = []) {
+  if (!usuario_email) return { ok: false, error: "Falta usuario_email" };
+  const usuario = await getUsuarioByEmail(pool, usuario_email);
+  if (!usuario) return { ok: false, error: "Usuario no encontrado" };
+  if (allowed.length === 0) return { ok: true, usuario };
+  const rolDesc = (usuario.rol_descripcion || "").trim();
+  if (allowed.includes(rolDesc)) return { ok: true, usuario };
+  return { ok: false, error: "Acceso denegado" };
+}
 
-    const totalResult = await pool.request().query("SELECT COUNT(*) AS total FROM Empleado");
-    const total = totalResult.recordset[0].total ?? 0;
+const PERMS = {
+  ADMIN: "Administrador",
+  RRHH: "RRHH",
+  EMPLEADO: "Empleado de planta",
+};
 
-    res.json({
-      empleados,
-      total,
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
-    });
+// RUTAS AUXILIARES
+
+router.get("/email/:correo", async (req, res) => {
+  try {
+    const correo = req.params.correo;
+    const pool = await connectDB();
+    const result = await pool
+      .request()
+      .input("correo", sql.VarChar, correo)
+      .query("SELECT id_empleado, nombre, correo, id_rol FROM Empleado WHERE correo = @correo");
+    if (!result.recordset.length) return res.status(404).json({ error: "Empleado no encontrado" });
+    res.json(result.recordset[0]);
   } catch (err) {
-    console.error("Error al obtener empleados:", err);
-    res.status(500).json({ error: "Error al obtener empleados" });
+    console.error("GET /email/:correo error:", err);
+    res.status(500).json({ error: "Error al obtener empleado" });
+  }
+});
+
+router.get("/rol/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+    const pool = await connectDB();
+    const usuario = await getUsuarioByEmail(pool, email);
+    if (!usuario) return res.status(404).json({ error: "Empleado no encontrado" });
+    res.json({ id_empleado: usuario.id_empleado, nombre: usuario.nombre, descripcion: usuario.rol_descripcion });
+  } catch (err) {
+    console.error("GET /rol/:email error:", err);
+    res.status(500).json({ error: "Error al obtener rol" });
   }
 });
 
 router.get("/estados/lista", async (req, res) => {
   try {
     const pool = await connectDB();
-    pool.config.requestTimeout = 30000;
     const result = await pool.request().query("SELECT * FROM Estado_empleado");
     res.json(result.recordset);
   } catch (err) {
-    console.error(err);
+    console.error("GET /estados/lista error:", err);
     res.status(500).json({ error: "Error al obtener estados" });
   }
 });
@@ -102,25 +114,313 @@ router.get("/estados/lista", async (req, res) => {
 router.get("/clinicas/lista", async (req, res) => {
   try {
     const pool = await connectDB();
-    pool.config.requestTimeout = 30000;
     const result = await pool.request().query("SELECT * FROM Clinica");
     res.json(result.recordset);
   } catch (err) {
-    console.error(err);
+    console.error("GET /clinicas/lista error:", err);
     res.status(500).json({ error: "Error al obtener clínicas" });
   }
 });
 
-router.post("/", async (req, res) => {
-  const { nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, usuario_email, foto } = req.body;
-
-  if (!nombre || !DNI || !correo || !id_estado || !id_clinica || !usuario_email) {
-    return res.status(400).json({ error: "Faltan campos obligatorios" });
+router.get("/roles/lista", async (req, res) => {
+  try {
+    const pool = await connectDB();
+    const result = await pool.request().query("SELECT * FROM Rol_empleado ORDER BY id_rol");
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("GET /roles/lista error:", err);
+    res.status(500).json({ error: "Error al obtener roles" });
   }
+});
+
+// Registrar acción
+
+router.post("/registrarAccion", async (req, res) => {
+  try {
+    const { usuario_email, accion, detalles } = req.body;
+    if (!usuario_email || !accion) return res.status(400).json({ error: "Faltan campos" });
+
+    const pool = await connectDB();
+    const usuario = await getUsuarioByEmail(pool, usuario_email);
+    if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+
+    await pool
+      .request()
+      .input("id_empleado", sql.Int, usuario.id_empleado)
+      .input("accion", sql.VarChar, accion)
+      .input("usuario", sql.VarChar, usuario.nombre)
+      .input("detalles", sql.NVarChar, detalles || "")
+      .query(`
+        INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
+        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+      `);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("POST /registrarAccion error:", err);
+    res.status(500).json({ error: "Error al registrar acción" });
+  }
+});
+
+// EXPORTAR EXCEL
+
+async function generarExcelEmpleados(empleadosList, res, filename = "Empleados.xlsx") {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Empleados");
+  worksheet.columns = [
+    { header: "ID", key: "id_empleado", width: 10 },
+    { header: "Nombre", key: "nombre", width: 30 },
+    { header: "DNI", key: "DNI", width: 20 },
+    { header: "Correo", key: "correo", width: 30 },
+    { header: "Fecha Ingreso", key: "fecha_ingreso", width: 15 },
+    { header: "Fecha Salida", key: "fecha_salida", width: 15 },
+    { header: "Teléfono", key: "telefono", width: 15 },
+    { header: "Dirección", key: "direccion", width: 30 },
+    { header: "Estado", key: "estado", width: 20 },
+    { header: "Clínica", key: "clinica", width: 25 },
+    { header: "Rol", key: "rol", width: 20 },
+  ];
+
+  empleadosList.forEach(emp => {
+    worksheet.addRow({
+      id_empleado: emp.id_empleado,
+      nombre: emp.nombre,
+      DNI: emp.DNI,
+      correo: emp.correo,
+      fecha_ingreso: emp.fecha_ingreso ? new Date(emp.fecha_ingreso).toISOString().split("T")[0] : "",
+      fecha_salida: emp.fecha_salida ? new Date(emp.fecha_salida).toISOString().split("T")[0] : "",
+      telefono: emp.telefono,
+      direccion: emp.direccion,
+      estado: emp.estado,
+      clinica: emp.clinica,
+      rol: emp.rol,
+    });
+  });
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  await workbook.xlsx.write(res);
+  res.end();
+}
+
+// GET usuario email
+
+router.get("/exportar", async (req, res) => {
+  try {
+    const usuario_email = req.query.usuario_email ?? "";
+    const pool = await connectDB();
+
+    // Verificar roles
+    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    if (!auth.ok) return res.status(403).json({ error: auth.error });
+    const usuarioActual = auth.usuario;
+
+    // GET empleados
+    
+    const result = await pool.request().query(`
+      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
+             e.telefono, e.direccion,
+             c.nombre_clinica AS clinica,
+             est.descripcion AS estado,
+             r.descripcion AS rol
+      FROM Empleado e
+      LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
+      LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
+      LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
+      ORDER BY e.id_empleado
+    `);
+
+    // Registrar acción en RRHH_RegistroAcciones
+    await pool
+      .request()
+      .input("id_empleado", sql.Int, usuarioActual.id_empleado)
+      .input("accion", sql.VarChar, "exportado")
+      .input("usuario", sql.VarChar, usuarioActual.nombre)
+      .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} exportó la lista de empleados`)
+      .query(`
+        INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
+        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+      `);
+
+    // Generar Excel
+    await generarExcelEmpleados(result.recordset, res);
+
+  } catch (err) {
+    console.error("GET /exportar error:", err);
+    res.status(500).json({ error: "Error al exportar Excel" });
+  }
+});
+
+
+router.post("/exportar", async (req, res) => {
+  try {
+    const body = req.body;
+    const pool = await connectDB();
+    let empleadosList = [];
+    let usuario_email = body?.usuario_email || req.query.usuario_email || req.headers["x-usuario-email"] || "";
+    let usuarioActual = null;
+
+    // Si tenemos usuario_email, verificamos roles y obtenemos datos del usuario
+    if (usuario_email) {
+      const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+      if (!auth.ok) return res.status(403).json({ error: auth.error });
+      usuarioActual = auth.usuario;
+    }
+
+    // Obtener lista de empleados
+    if (Array.isArray(body) && body.length > 0) {
+      empleadosList = body;
+    } else if (Array.isArray(body?.empleados) && body.empleados.length > 0) {
+      empleadosList = body.empleados;
+    } else {
+      if (!usuario_email) return res.status(400).json({ error: "Falta usuario_email para exportar desde DB" });
+
+      const result = await pool.request().query(`
+        SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
+               e.telefono, e.direccion,
+               c.nombre_clinica AS clinica,
+               est.descripcion AS estado,
+               r.descripcion AS rol
+        FROM Empleado e
+        LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
+        LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
+        LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
+        ORDER BY e.id_empleado
+      `);
+      empleadosList = result.recordset;
+    }
+
+    // Registrar acción si tenemos usuarioActual
+
+    if (usuarioActual) {
+      await pool
+        .request()
+        .input("id_empleado", sql.Int, usuarioActual.id_empleado)
+        .input("accion", sql.VarChar, "exportado")
+        .input("usuario", sql.VarChar, usuarioActual.nombre)
+        .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} exportó la lista de empleados`)
+        .query(`
+          INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
+          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+        `);
+    }
+
+    // Generar Excel
+
+    await generarExcelEmpleados(empleadosList, res);
+
+  } catch (err) {
+    console.error("POST /exportar error:", err);
+    res.status(500).json({ error: "Error al exportar Excel" });
+  }
+});
+
+
+router.get("/mi-perfil/:correo", async (req, res) => {
+  const { correo } = req.params;
+  if (!correo) return res.status(400).json({ error: "Falta correo del usuario" });
 
   try {
     const pool = await connectDB();
+    const result = await pool.request()
+      .input("correo", sql.VarChar, correo)
+      .query(`
+        SELECT e.id_empleado, e.nombre, e.correo, e.DNI, e.telefono,
+               c.nombre_clinica AS clinica,
+               est.descripcion AS estado,
+               e.fecha_ingreso
+        FROM Empleado e
+        LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
+        LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
+        WHERE e.correo = @correo
+      `);
+
+    if (!result.recordset.length) return res.status(404).json({ error: "Empleado no encontrado" });
+
+    res.json(result.recordset[0]);
+  } catch (err) {
+    console.error("GET /mi-perfil error:", err);
+    res.status(500).json({ error: "Error al obtener perfil" });
+  }
+});
+
+
+
+// LISTA
+
+router.get("/", async (req, res) => {
+  try {
+    const pool = await connectDB();
     pool.config.requestTimeout = 30000;
+
+    const usuario_email = req.query.usuario_email || req.headers["x-usuario-email"] || "";
+    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    if (!auth.ok) return res.status(403).json({ error: auth.error });
+
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const filterEstado = req.query.estado ? Number(req.query.estado) : null;
+    const filterClinica = req.query.clinica ? Number(req.query.clinica) : null;
+    const whereClauses = [];
+    if (filterEstado) whereClauses.push(`e.id_estado = ${filterEstado}`);
+    if (filterClinica) whereClauses.push(`e.id_clinica = ${filterClinica}`);
+    const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+    const query = `
+      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
+             e.telefono, e.direccion,
+             c.nombre_clinica AS clinica,
+             est.descripcion AS estado,
+             r.descripcion AS rol,
+             e.foto,
+             e.id_estado,
+             e.id_clinica,
+             e.id_rol
+      FROM Empleado e
+      LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
+      LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
+      LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
+      ${whereSql}
+      ORDER BY e.id_empleado
+      OFFSET @offset ROWS
+      FETCH NEXT @limit ROWS ONLY
+    `;
+    const result = await pool.request().input("offset", sql.Int, offset).input("limit", sql.Int, limit).query(query);
+    const empleados = result.recordset.map(emp => ({ ...emp, foto: emp.foto ? Buffer.from(emp.foto).toString("base64") : null }));
+
+    const totalResult = await pool.request().query("SELECT COUNT(*) AS total FROM Empleado");
+    const total = totalResult.recordset[0].total ?? 0;
+
+    res.json({ empleados, total, currentPage: page, totalPages: Math.ceil(total / limit) });
+  } catch (err) {
+    console.error("GET / error:", err);
+    res.status(500).json({ error: "Error al obtener empleados" });
+  }
+});
+
+// CREAR empleado (POST /)
+
+router.post("/", async (req, res) => {
+  try {
+    const {
+      nombre, DNI, correo, fecha_ingreso,
+      telefono, direccion, id_estado, id_clinica, id_rol,
+      foto, usuario_email,
+    } = req.body;
+
+    if (!nombre || !DNI || !correo || !id_estado || !id_clinica || !usuario_email) {
+      return res.status(400).json({ error: "Faltan campos obligatorios" });
+    }
+
+    const pool = await connectDB();
+    pool.config.requestTimeout = 30000;
+
+    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    if (!auth.ok) return res.status(403).json({ error: auth.error });
+    const usuarioActual = auth.usuario;
+
     const fotoBuffer = foto ? Buffer.from(foto, "base64") : null;
 
     const insertResult = await pool
@@ -132,179 +432,159 @@ router.post("/", async (req, res) => {
       .input("direccion", sql.VarChar, String(direccion || ""))
       .input("id_estado", sql.Int, Number(id_estado))
       .input("id_clinica", sql.Int, Number(id_clinica))
+      .input("id_rol", sql.Int, Number(id_rol || 3))
       .input("foto", sql.VarBinary(sql.MAX), fotoBuffer)
+      .input("fecha_ingreso", sql.Date, fecha_ingreso ? new Date(fecha_ingreso) : null)
       .query(`
-        INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, fecha_ingreso, foto)
-        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, GETDATE(), @foto);
+        INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, id_rol, fecha_ingreso, foto)
+        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETDATE()), @foto);
         SELECT SCOPE_IDENTITY() AS id_empleado;
       `);
 
-    const nuevoEmpleadoId = insertResult.recordset[0].id_empleado;
+    const nuevoEmpleadoId = insertResult.recordset[0]?.id_empleado ?? null;
 
-    const usuarioResult = await pool
-      .request()
-      .input("correo", sql.VarChar, String(usuario_email))
-      .query("SELECT id_empleado, nombre FROM Empleado WHERE correo = @correo");
-
-    if (usuarioResult.recordset.length === 0)
-      return res.status(404).json({ error: "Usuario activo no encontrado" });
-
-    const usuarioActual = usuarioResult.recordset[0];
-
-    await pool
-      .request()
-      .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-      .input("accion", sql.VarChar, "agregado")
-      .input("usuario", sql.VarChar, usuarioActual.nombre)
-      .input("detalles", sql.VarChar, `El usuario ${usuarioActual.nombre} ha agregado al empleado ${nombre}`)
-      .query(`
-        INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
-      `);
+    // Registrar acción (si existe usuarioActual)
+    if (usuarioActual && usuarioActual.id_empleado) {
+      await pool
+        .request()
+        .input("id_empleado", sql.Int, usuarioActual.id_empleado)
+        .input("accion", sql.VarChar, "agregado")
+        .input("usuario", sql.VarChar, usuarioActual.nombre)
+        .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} ha agregado al empleado ${nombre}`)
+        .query(`
+          INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
+          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+        `);
+    }
 
     res.json({ success: true, message: "Empleado agregado correctamente", id_empleado: nuevoEmpleadoId });
   } catch (err) {
-    console.error("Error al agregar empleado:", err);
+    console.error("POST / error:", err);
     res.status(500).json({ error: "Error al agregar empleado" });
   }
 });
 
+// ACTUALIZAR empleado (PUT /:id)
+
 router.put("/:id", async (req, res) => {
-  const { id } = req.params;
-  const { id_estado, id_clinica, usuario_email, foto } = req.body;
-
-  if (!id_estado || !id_clinica || !usuario_email)
-    return res.status(400).json({ error: "Faltan campos obligatorios para actualizar" });
-
   try {
+    const { id } = req.params;
+    const {
+      nombre, DNI, correo, fecha_ingreso, telefono, direccion,
+      id_estado, id_clinica, id_rol, fecha_salida, foto, usuario_email,
+    } = req.body;
+
+    if (!usuario_email) return res.status(400).json({ error: "Falta usuario_email" });
+
     const pool = await connectDB();
     pool.config.requestTimeout = 30000;
 
-    const actualResult = await pool
+    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    if (!auth.ok) return res.status(403).json({ error: auth.error });
+    const usuarioActual = auth.usuario;
+
+    const prev = await pool
       .request()
-      .input("id", sql.Int, id)
+      .input("id", sql.Int, Number(id))
       .query(`
-        SELECT e.id_empleado, e.nombre, e.fecha_salida,
-               est.descripcion AS estado,
-               c.nombre_clinica AS clinica
+        SELECT e.id_empleado, e.nombre, e.id_rol, r.descripcion AS rol, est.descripcion AS estado, c.nombre_clinica AS clinica
         FROM Empleado e
-        INNER JOIN Estado_empleado est ON e.id_estado = est.id_estado
-        INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
+        LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
+        LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
+        LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
         WHERE e.id_empleado = @id
       `);
 
-    if (actualResult.recordset.length === 0)
+    if (!prev.recordset || prev.recordset.length === 0) {
       return res.status(404).json({ error: "Empleado no encontrado" });
+    }
+    const anterior = prev.recordset[0];
 
-    const actual = actualResult.recordset[0];
-
-    const estadoNuevo = await pool
-      .request()
-      .input("id_estado", sql.Int, id_estado)
-      .query("SELECT descripcion FROM Estado_empleado WHERE id_estado = @id_estado");
-
-    const clinicaNueva = await pool
-      .request()
-      .input("id_clinica", sql.Int, id_clinica)
-      .query("SELECT nombre_clinica FROM Clinica WHERE id_clinica = @id_clinica");
-
-    const nuevoEstadoDesc = (estadoNuevo.recordset[0]?.descripcion || "").trim().toLowerCase();
-
-    let fechaSalidaClause = "";
-    if (["despedido", "renuncia"].includes(nuevoEstadoDesc)) fechaSalidaClause = "fecha_salida = GETDATE()";
-    else if (["activo", "on leave", "onleave"].includes(nuevoEstadoDesc)) fechaSalidaClause = "fecha_salida = NULL";
-
-    const fotoBuffer = foto ? Buffer.from(foto, "base64") : null;
     const updates = [];
-    if (fechaSalidaClause) updates.push(fechaSalidaClause);
-    updates.push("id_estado = @id_estado");
-    updates.push("id_clinica = @id_clinica");
-    if (fotoBuffer) updates.push("foto = @foto");
+    const request = pool.request().input("id", sql.Int, Number(id));
+
+    if (nombre !== undefined) { updates.push("nombre = @nombre"); request.input("nombre", sql.VarChar, String(nombre)); }
+    if (DNI !== undefined) { updates.push("DNI = @DNI"); request.input("DNI", sql.VarChar, String(DNI)); }
+    if (correo !== undefined) { updates.push("correo = @correo"); request.input("correo", sql.VarChar, String(correo)); }
+    if (fecha_ingreso !== undefined) { updates.push("fecha_ingreso = @fecha_ingreso"); request.input("fecha_ingreso", sql.Date, fecha_ingreso ? new Date(fecha_ingreso) : null); }
+    if (telefono !== undefined) { updates.push("telefono = @telefono"); request.input("telefono", sql.VarChar, String(telefono)); }
+    if (direccion !== undefined) { updates.push("direccion = @direccion"); request.input("direccion", sql.VarChar, String(direccion)); }
+    if (id_estado !== undefined) { updates.push("id_estado = @id_estado"); request.input("id_estado", sql.Int, Number(id_estado)); }
+    if (id_clinica !== undefined) { updates.push("id_clinica = @id_clinica"); request.input("id_clinica", sql.Int, Number(id_clinica)); }
+    if (id_rol !== undefined) { updates.push("id_rol = @id_rol"); request.input("id_rol", sql.Int, Number(id_rol)); }
+    if (fecha_salida !== undefined) { updates.push("fecha_salida = @fecha_salida"); request.input("fecha_salida", sql.Date, fecha_salida ? new Date(fecha_salida) : null); }
+    if (foto !== undefined && foto !== null) { updates.push("foto = @foto"); request.input("foto", sql.VarBinary(sql.MAX), Buffer.from(foto, "base64")); }
+
+    if (updates.length === 0) return res.status(400).json({ error: "No hay campos para actualizar" });
 
     const updateQuery = `UPDATE Empleado SET ${updates.join(", ")} WHERE id_empleado = @id`;
-
-    const request = pool.request()
-      .input("id_estado", sql.Int, id_estado)
-      .input("id_clinica", sql.Int, id_clinica)
-      .input("id", sql.Int, id);
-
-    if (fotoBuffer) request.input("foto", sql.VarBinary(sql.MAX), fotoBuffer);
     await request.query(updateQuery);
 
-    const usuarioResult = await pool
-      .request()
-      .input("correo", sql.VarChar, String(usuario_email))
-      .query("SELECT id_empleado, nombre FROM Empleado WHERE correo = @correo");
+    // Log de cambios
+    const estadoNuevoRes = id_estado ? await pool.request().input("id_estado", sql.Int, Number(id_estado)).query("SELECT descripcion FROM Estado_empleado WHERE id_estado = @id_estado") : null;
+    const clinicaNuevaRes = id_clinica ? await pool.request().input("id_clinica", sql.Int, Number(id_clinica)).query("SELECT nombre_clinica FROM Clinica WHERE id_clinica = @id_clinica") : null;
+    const rolNuevoRes = id_rol ? await pool.request().input("id_rol", sql.Int, Number(id_rol)).query("SELECT descripcion FROM Rol_empleado WHERE id_rol = @id_rol") : null;
 
-    if (usuarioResult.recordset.length === 0)
-      return res.status(404).json({ error: "Usuario activo no encontrado" });
+    const cambios = [];
+    if (id_estado !== undefined) cambios.push(`Estado: ${anterior.estado} -> ${estadoNuevoRes.recordset[0]?.descripcion || id_estado}`);
+    if (id_clinica !== undefined) cambios.push(`Clínica: ${anterior.clinica} -> ${clinicaNuevaRes.recordset[0]?.nombre_clinica || id_clinica}`);
+    if (id_rol !== undefined) cambios.push(`Rol: ${anterior.rol} -> ${rolNuevoRes.recordset[0]?.descripcion || id_rol}`);
+    if (nombre !== undefined) cambios.push(`Nombre: ${anterior.nombre} -> ${nombre}`);
+    if (DNI !== undefined) cambios.push(`DNI: ${anterior.DNI} -> ${DNI}`);
 
-    const usuarioActual = usuarioResult.recordset[0];
+    const detalles = `El usuario ${usuarioActual.nombre} ha actualizado a ${anterior.nombre}. Cambios: ${cambios.join("; ")}`;
 
-    await pool
-      .request()
-      .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-      .input("accion", sql.VarChar, "actualizado")
-      .input("usuario", sql.VarChar, usuarioActual.nombre)
-      .input(
-        "detalles",
-        sql.VarChar,
-        `El usuario ${usuarioActual.nombre} ha actualizado a ${actual.nombre} cambiando el Estado de ${actual.estado} a ${estadoNuevo.recordset[0].descripcion} y la Clínica de ${actual.clinica} a ${clinicaNueva.recordset[0].nombre_clinica}`
-      )
-      .query(`
-        INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
-      `);
+    if (usuarioActual && usuarioActual.id_empleado) {
+      await pool
+        .request()
+        .input("id_empleado", sql.Int, usuarioActual.id_empleado)
+        .input("accion", sql.VarChar, "actualizado")
+        .input("usuario", sql.VarChar, usuarioActual.nombre)
+        .input("detalles", sql.NVarChar, detalles)
+        .query(`
+          INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
+          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+        `);
+    }
 
     res.json({ success: true, message: "Empleado actualizado correctamente" });
   } catch (err) {
-    console.error("Error al actualizar empleado:", err);
+    console.error("PUT /:id error:", err);
     res.status(500).json({ error: "Error al actualizar empleado" });
   }
 });
 
+// ELIMINAR empleado (DELETE /:id)
+
 router.delete("/:id", async (req, res) => {
-  const { id } = req.params;
-  const { usuario_email } = req.body;
-
-  if (!usuario_email)
-    return res.status(400).json({ error: "Falta usuario_email para registro de acción" });
-
   try {
+    const { id } = req.params;
+    const usuario_email = req.body?.usuario_email || req.query?.usuario_email || req.headers["x-usuario-email"] || "";
+    if (!usuario_email) return res.status(400).json({ error: "Falta usuario_email para registro de acción" });
+
     const pool = await connectDB();
     pool.config.requestTimeout = 30000;
 
-    await pool.request().input("id", sql.Int, id).query("DELETE FROM Historial_clinica WHERE id_empleado = @id");
-    await pool.request().input("id", sql.Int, id).query("DELETE FROM CuentaSSO WHERE id_empleado = @id");
+    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    if (!auth.ok) return res.status(403).json({ error: auth.error });
+    const usuarioActual = auth.usuario;
 
-    const empleadoResult = await pool
-      .request()
-      .input("id", sql.Int, id)
-      .query("SELECT nombre FROM Empleado WHERE id_empleado = @id");
+    const empleadoRes = await pool.request().input("id", sql.Int, Number(id)).query("SELECT nombre FROM Empleado WHERE id_empleado = @id");
+    if (!empleadoRes.recordset || empleadoRes.recordset.length === 0) return res.status(404).json({ error: "Empleado no encontrado" });
+    const empleado = empleadoRes.recordset[0];
 
-    if (empleadoResult.recordset.length === 0)
-      return res.status(404).json({ error: "Empleado no encontrado" });
+    await pool.request().input("id", sql.Int, Number(id)).query("DELETE FROM Historial_clinica WHERE id_empleado = @id");
+    await pool.request().input("id", sql.Int, Number(id)).query("DELETE FROM CuentaSSO WHERE id_empleado = @id");
+    await pool.request().input("id", sql.Int, Number(id)).query("DELETE FROM Empleado WHERE id_empleado = @id");
 
-    const empleado = empleadoResult.recordset[0];
-
-    const usuarioResult = await pool
-      .request()
-      .input("correo", sql.VarChar, String(usuario_email))
-      .query("SELECT id_empleado, nombre FROM Empleado WHERE correo = @correo");
-
-    if (usuarioResult.recordset.length === 0)
-      return res.status(404).json({ error: "Usuario activo no encontrado" });
-
-    const usuarioActual = usuarioResult.recordset[0];
-
-    await pool.request().input("id", sql.Int, id).query("DELETE FROM Empleado WHERE id_empleado = @id");
-
+    // Registrar acción
+    const detalles = `El usuario ${usuarioActual.nombre} ha eliminado al empleado ${empleado.nombre}`;
     await pool
       .request()
       .input("id_empleado", sql.Int, usuarioActual.id_empleado)
       .input("accion", sql.VarChar, "eliminado")
       .input("usuario", sql.VarChar, usuarioActual.nombre)
-      .input("detalles", sql.VarChar, `El usuario ${usuarioActual.nombre} ha eliminado al empleado ${empleado.nombre}`)
+      .input("detalles", sql.NVarChar, detalles)
       .query(`
         INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
         VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
@@ -312,75 +592,12 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ success: true, message: "Empleado eliminado correctamente" });
   } catch (err) {
-    console.error("Error al eliminar empleado:", err);
+    console.error("DELETE /:id error:", err);
     res.status(500).json({ error: "Error al eliminar empleado" });
   }
 });
 
-router.get("/exportar", async (req, res) => {
-  try {
-    const pool = await connectDB();
-    pool.config.requestTimeout = 30000;
-
-    const result = await pool.request().query(`
-      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
-             e.telefono, e.direccion,
-             c.nombre_clinica AS clinica,
-             est.descripcion AS estado
-      FROM Empleado e
-      INNER JOIN Clinica c ON e.id_clinica = c.id_clinica
-      INNER JOIN Estado_empleado est ON e.id_estado = est.id_estado
-    `);
-
-    const empleados = result.recordset;
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Empleados");
-
-    worksheet.columns = [
-      { header: "ID", key: "id_empleado", width: 10 },
-      { header: "Nombre", key: "nombre", width: 30 },
-      { header: "DNI", key: "DNI", width: 15 },
-      { header: "Correo", key: "correo", width: 25 },
-      { header: "Fecha Ingreso", key: "fecha_ingreso", width: 15 },
-      { header: "Fecha Salida", key: "fecha_salida", width: 15 },
-      { header: "Teléfono", key: "telefono", width: 15 },
-      { header: "Dirección", key: "direccion", width: 25 },
-      { header: "Estado", key: "estado", width: 15 },
-      { header: "Clínica", key: "clinica", width: 20 },
-    ];
-
-    empleados.forEach(emp => {
-      worksheet.addRow({
-        id_empleado: emp.id_empleado,
-        nombre: emp.nombre,
-        DNI: emp.DNI,
-        correo: emp.correo,
-        fecha_ingreso: emp.fecha_ingreso ? emp.fecha_ingreso.toISOString().split("T")[0] : "",
-        fecha_salida: emp.fecha_salida ? emp.fecha_salida.toISOString().split("T")[0] : "",
-        telefono: emp.telefono,
-        direccion: emp.direccion,
-        estado: emp.estado,
-        clinica: emp.clinica
-      });
-    });
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      'attachment; filename="Empleados.xlsx"'
-    );
-
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (err) {
-    console.error("Error al exportar Excel:", err);
-    res.status(500).json({ error: "Error al exportar Excel" });
-  }
-});
+// IMPORTAR empleados desde Excel (POST /importar)
 
 router.post("/importar", upload.single("archivo"), async (req, res) => {
   const { usuario_email } = req.body;
@@ -388,55 +605,49 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
   if (!usuario_email) return res.status(400).json({ error: "Falta usuario_email" });
 
   const filePath = req.file.path;
-
   try {
     const pool = await connectDB();
     pool.config.requestTimeout = 60000;
+
+    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    if (!auth.ok) {
+      try { fs.unlinkSync(filePath); } catch (e) {}
+      return res.status(403).json({ error: auth.error });
+    }
+    const usuarioActual = auth.usuario;
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
     const worksheet = workbook.getWorksheet(1);
     const empleadosAgregados = [];
 
-    const usuarioResult = await pool
-      .request()
-      .input("correo", sql.VarChar, String(usuario_email))
-      .query("SELECT id_empleado, nombre FROM Empleado WHERE correo = @correo");
-
-    if (usuarioResult.recordset.length === 0) {
-      try { fs.unlinkSync(filePath); } catch (e) {}
-      return res.status(404).json({ error: "Usuario activo no encontrado" });
-    }
-    const usuarioActual = usuarioResult.recordset[0];
-
     for (let i = 2; i <= worksheet.rowCount; i++) {
       const row = worksheet.getRow(i);
-
       const nombre = cellToString(row.getCell(1).value);
       const DNI = cellToString(row.getCell(2).value);
       const correo = cellToString(row.getCell(3).value);
-      const fechaIngresoRaw = row.getCell(4).value;
-      const fechaSalidaRaw = row.getCell(5).value;
+      // Asumimos formato: Nombre | DNI | Correo | Fecha Ingreso | Fecha Salida | Teléfono | Dirección | Estado | Clínica | Rol
+      const fechaIngCell = row.getCell(4).value;
+      const fechaSalCell = row.getCell(5).value;
       const telefono = cellToString(row.getCell(6).value || "");
       const direccion = cellToString(row.getCell(7).value || "");
-      const id_estado = Number(row.getCell(8).value);
-      const id_clinica = Number(row.getCell(9).value);
+      const id_estado = Number(cellToString(row.getCell(8).value || "1"));
+      const id_clinica = Number(cellToString(row.getCell(9).value || "1"));
+      const id_rol = Number(cellToString(row.getCell(10).value || "3"));
+      const fotoBase64 = cellToString(row.getCell(11).value) || null;
+      const fotoBuffer = fotoBase64 ? Buffer.from(fotoBase64, "base64") : null;
 
-      if (!nombre || !DNI || !correo || !id_estado || !id_clinica) continue;
+      if (!nombre || !DNI || !correo) continue;
 
       const existe = await pool
         .request()
         .input("DNI", sql.VarChar, DNI)
         .input("correo", sql.VarChar, correo)
-        .query(`SELECT COUNT(*) AS existe FROM Empleado WHERE DNI = @DNI OR correo = @correo`);
-
+        .query("SELECT COUNT(*) AS existe FROM Empleado WHERE DNI = @DNI OR correo = @correo");
       if (existe.recordset[0].existe > 0) continue;
 
-      let fecha_ingreso = null;
-      let fecha_salida = null;
-
-      if (fechaIngresoRaw) fecha_ingreso = fechaIngresoRaw instanceof Date ? fechaIngresoRaw : new Date(cellToString(fechaIngresoRaw));
-      if (fechaSalidaRaw) fecha_salida = fechaSalidaRaw instanceof Date ? fechaSalidaRaw : new Date(cellToString(fechaSalidaRaw));
+      const fecha_ingreso = fechaIngCell instanceof Date ? fechaIngCell : (fechaIngCell ? new Date(cellToString(fechaIngCell)) : null);
+      const fecha_salida = fechaSalCell instanceof Date ? fechaSalCell : (fechaSalCell ? new Date(cellToString(fechaSalCell)) : null);
 
       const insertResult = await pool
         .request()
@@ -447,37 +658,37 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
         .input("direccion", sql.VarChar, direccion)
         .input("id_estado", sql.Int, id_estado)
         .input("id_clinica", sql.Int, id_clinica)
+        .input("id_rol", sql.Int, id_rol)
         .input("fecha_ingreso", sql.Date, fecha_ingreso)
         .input("fecha_salida", sql.Date, fecha_salida)
+        .input("foto", sql.VarBinary(sql.MAX), fotoBuffer)
         .query(`
-          INSERT INTO Empleado 
-          (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, fecha_ingreso, fecha_salida)
-          VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @fecha_ingreso, @fecha_salida);
+          INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, id_rol, fecha_ingreso, fecha_salida, foto)
+          VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETDATE()), @fecha_salida, @foto);
           SELECT SCOPE_IDENTITY() AS id_empleado;
         `);
 
-      const nuevoEmpleadoId = insertResult.recordset[0].id_empleado;
+      const nuevoEmpleadoId = insertResult.recordset[0]?.id_empleado ?? null;
+      empleadosAgregados.push({ id_empleado: nuevoEmpleadoId, nombre });
 
+      // Registrar acción por cada importado
       await pool
         .request()
         .input("id_empleado", sql.Int, usuarioActual.id_empleado)
         .input("accion", sql.VarChar, "importado")
         .input("usuario", sql.VarChar, usuarioActual.nombre)
-        .input("detalles", sql.VarChar, `El usuario ${usuarioActual.nombre} ha importado al empleado ${nombre}`)
+        .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} ha importado al empleado ${nombre}`)
         .query(`
           INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
           VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
         `);
-
-      empleadosAgregados.push(nombre);
     }
 
     try { fs.unlinkSync(filePath); } catch (e) {}
-
-    res.json({ success: true, message: `Empleados importados correctamente: ${empleadosAgregados.join(", ")}` });
+    res.json({ success: true, message: "Archivo importado correctamente", empleados: empleadosAgregados });
   } catch (err) {
-    console.error("Error al importar Excel:", err);
     try { fs.unlinkSync(filePath); } catch (e) {}
+    console.error("POST /importar error:", err);
     res.status(500).json({ error: "Error al importar Excel" });
   }
 });

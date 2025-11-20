@@ -3,7 +3,7 @@ import sql from "mssql";
 const dbConfig = {
   user: "appuser",
   password: "12345",
-  server: "OSCAR-MACOTO-HN01",
+  server: "localhost",
   port: 1433,
   database: "RRHH",
   options: {
@@ -11,36 +11,43 @@ const dbConfig = {
     trustServerCertificate: true,
   },
   pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
+    max: 20,
+    min: 5,
+    idleTimeoutMillis: 60000,   
   },
-  requestTimeout: 30000,
+  connectionTimeout: 30000,   
+  requestTimeout: 60000,        
 };
 
-let poolGlobal = null;
+let pool;
 
 export async function connectDB() {
   try {
-    if (poolGlobal) {
-      if (poolGlobal.connected) return poolGlobal;
-      await poolGlobal.connect();
-      return poolGlobal;
+    if (pool) {
+      // Si existe pero está desconectado → reconectar
+      if (!pool.connected) {
+        console.warn("Pool existía pero desconectado, reconectando...");
+        await pool.connect();
+      }
+      return pool;
     }
 
-    poolGlobal = new sql.ConnectionPool(dbConfig);
+    // Crear pool limpio
+    pool = new sql.ConnectionPool(dbConfig);
 
-    poolGlobal.on("error", (err) => {
-      console.error("Error en el pool SQL:", err);
-      poolGlobal = null;
+    // Manejo de errores del pool global
+    pool.on("error", (err) => {
+      console.error("💥 Error en el pool SQL:", err);
+      pool = null; // ← reiniciar pool cuando falle
     });
 
-    await poolGlobal.connect();
-    console.log("Conectado a la base de datos (pool inicializado)");
-    return poolGlobal;
+    await pool.connect();
+    console.log("Pool SQL conectado correctamente");
+    return pool;
+
   } catch (error) {
-    console.error("Error de conexión a la base de datos:", error);
-    poolGlobal = null;
+    console.error("Error conectando a SQL:", error);
+    pool = null;
     throw error;
   }
 }

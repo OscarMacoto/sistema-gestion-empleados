@@ -50,6 +50,8 @@ function Clinicas() {
   const totalPaginas = Math.ceil(filtrados.length / porPagina);
   const inicio = (pagina - 1) * porPagina;
   const fin = inicio + porPagina;
+  const rolActual = localStorage.getItem("usuario_rol");
+  const agregarClinicaDeshabilitado = rolActual !== "Administrador";
 
   return (
     <div className="p-6 bg-white rounded-2xl shadow-md">
@@ -64,11 +66,17 @@ function Clinicas() {
           className="border p-2 w-full rounded-lg mr-4"
         />
         <button
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          {mostrarFormulario ? "Cancelar" : "Agregar clínica"}
-        </button>
+           onClick={() => !agregarClinicaDeshabilitado && setMostrarFormulario(!mostrarFormulario)}
+          disabled={agregarClinicaDeshabilitado}
+          className={`px-4 py-2 rounded text-white 
+            ${agregarClinicaDeshabilitado 
+              ? "bg-gray-400 cursor-not-allowed" 
+              : "bg-green-600 hover:bg-green-700"
+            }`}
+>
+  {mostrarFormulario ? "Cancelar" : "Agregar clínica"}
+</button>
+
       </div>
 
       {mostrarFormulario && (
@@ -91,7 +99,7 @@ function Clinicas() {
       )}
 
       <table className="min-w-full border border-gray-300 rounded-lg text-center">
-        <thead className="bg-blue-600 text-white">
+        <thead className="bg-gray-300 text-black">
           <tr>
             <th className="py-2 px-4">ID</th>
             <th className="py-2 px-4">Nombre Clínica</th>

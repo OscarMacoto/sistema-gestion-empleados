@@ -36,7 +36,7 @@ function Estados() {
       />
 
       <table className="min-w-full border border-gray-300 rounded-lg text-center">
-        <thead className="bg-blue-600 text-white">
+        <thead className="bg-gray-300 text-black">
           <tr>
             <th className="py-2 px-4">ID</th>
             <th className="py-2 px-4">Descripción</th>
