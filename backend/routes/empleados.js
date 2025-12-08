@@ -69,7 +69,7 @@ const PERMS = {
   EMPLEADO: "Empleado de planta",
 };
 
-// RUTAS AUXILIARES
+// RUTAS
 
 router.get("/email/:correo", async (req, res) => {
   try {
@@ -260,7 +260,6 @@ router.post("/exportar", async (req, res) => {
     let usuario_email = body?.usuario_email || req.query.usuario_email || req.headers["x-usuario-email"] || "";
     let usuarioActual = null;
 
-    // Si tenemos usuario_email, verificamos roles y obtenemos datos del usuario
     if (usuario_email) {
       const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
       if (!auth.ok) return res.status(403).json({ error: auth.error });
@@ -358,7 +357,7 @@ router.get("/", async (req, res) => {
     if (!auth.ok) return res.status(403).json({ error: auth.error });
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 1000));
     const offset = (page - 1) * limit;
 
     const filterEstado = req.query.estado ? Number(req.query.estado) : null;
@@ -443,12 +442,11 @@ router.post("/", async (req, res) => {
 
     const nuevoEmpleadoId = insertResult.recordset[0]?.id_empleado ?? null;
 
-    // Registrar acción (si existe usuarioActual)
     if (usuarioActual && usuarioActual.id_empleado) {
       await pool
         .request()
         .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-        .input("accion", sql.VarChar, "agregado")
+        .input("accion", sql.VarChar, "Agregado")
         .input("usuario", sql.VarChar, usuarioActual.nombre)
         .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} ha agregado al empleado ${nombre}`)
         .query(`
@@ -538,7 +536,7 @@ router.put("/:id", async (req, res) => {
       await pool
         .request()
         .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-        .input("accion", sql.VarChar, "actualizado")
+        .input("accion", sql.VarChar, "Actualizado")
         .input("usuario", sql.VarChar, usuarioActual.nombre)
         .input("detalles", sql.NVarChar, detalles)
         .query(`
@@ -582,7 +580,7 @@ router.delete("/:id", async (req, res) => {
     await pool
       .request()
       .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-      .input("accion", sql.VarChar, "eliminado")
+      .input("accion", sql.VarChar, "Eliminado")
       .input("usuario", sql.VarChar, usuarioActual.nombre)
       .input("detalles", sql.NVarChar, detalles)
       .query(`
@@ -626,7 +624,6 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
       const nombre = cellToString(row.getCell(1).value);
       const DNI = cellToString(row.getCell(2).value);
       const correo = cellToString(row.getCell(3).value);
-      // Asumimos formato: Nombre | DNI | Correo | Fecha Ingreso | Fecha Salida | Teléfono | Dirección | Estado | Clínica | Rol
       const fechaIngCell = row.getCell(4).value;
       const fechaSalCell = row.getCell(5).value;
       const telefono = cellToString(row.getCell(6).value || "");
@@ -675,7 +672,7 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
       await pool
         .request()
         .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-        .input("accion", sql.VarChar, "importado")
+        .input("accion", sql.VarChar, "Importado")
         .input("usuario", sql.VarChar, usuarioActual.nombre)
         .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} ha importado al empleado ${nombre}`)
         .query(`

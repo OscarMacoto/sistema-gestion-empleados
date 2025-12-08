@@ -182,7 +182,7 @@ const Empleado = () => {
       ...nuevoEmpleado,
       id_rol:
         Number(nuevoEmpleado.id_rol) ||
-        roles.find((r) => r.nombre_rol === "Empleado de Planta")?.id_rol ||
+        roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
         3,
       usuario_email: usuarioActivo.correo,
       fecha_salida: fechaSalida,
@@ -222,7 +222,7 @@ const Empleado = () => {
       id_rol:
         empleado.id_rol ||
         roles.find((r) => r.nombre_rol === empleado.rol)?.id_rol ||
-        roles.find((r) => r.nombre_rol === "Empleado de Planta")?.id_rol ||
+        roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
         3,
       telefono: empleado.telefono || "",
       direccion: empleado.direccion || "",
@@ -312,7 +312,7 @@ const eliminarEmpleado = async (id) => {
 
     await axios.post("http://localhost:5000/api/empleados/registrarAccion", {
       usuario_email: usuarioActivo.correo,
-      accion: "Exportar Excel",
+      accion: "Exportar Usuarios",
       detalles: `El usuario ${usuarioActivo.nombre} exportó la lista de empleados`,
     });
 
@@ -561,7 +561,7 @@ const eliminarEmpleado = async (id) => {
           onClick={limpiarFiltros}
           className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-400"
         >
-          Limpiar filtros
+          Limpiar
         </button>
       </div>
 

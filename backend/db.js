@@ -24,7 +24,6 @@ let pool;
 export async function connectDB() {
   try {
     if (pool) {
-      // Si existe pero está desconectado → reconectar
       if (!pool.connected) {
         console.warn("Pool existía pero desconectado, reconectando...");
         await pool.connect();
@@ -32,13 +31,11 @@ export async function connectDB() {
       return pool;
     }
 
-    // Crear pool limpio
     pool = new sql.ConnectionPool(dbConfig);
 
-    // Manejo de errores del pool global
     pool.on("error", (err) => {
       console.error("💥 Error en el pool SQL:", err);
-      pool = null; // ← reiniciar pool cuando falle
+      pool = null; 
     });
 
     await pool.connect();

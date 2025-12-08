@@ -53,14 +53,7 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-100">
-        <div className="p-10 bg-white rounded-lg shadow-lg text-center">
-          <h2 className="text-2xl font-bold mb-4 text-gray-700">
-            Bienvenido al Sistema de Gestión de Empleados de ELEOS
-          </h2>
           <LoginMicrosoft />
-        </div>
-      </div>
     );
   }
 
@@ -87,7 +80,10 @@ function AppContent() {
         >
           Cerrar sesión
         </button>
+
         <Routes>
+
+          {/* Empleados — Admin y RRHH */}
           <Route
             path="/"
             element={
@@ -97,6 +93,7 @@ function AppContent() {
             }
           />
 
+          {/* Clínicas — Admin y RRHH */}
           <Route
             path="/clinicas"
             element={
@@ -106,6 +103,7 @@ function AppContent() {
             }
           />
 
+          {/* Estados — Admin y RRHH */}
           <Route
             path="/estados"
             element={
@@ -115,6 +113,7 @@ function AppContent() {
             }
           />
 
+          {/* SSO — Admin y RRHH */}
           <Route
             path="/sso"
             element={
@@ -124,6 +123,7 @@ function AppContent() {
             }
           />
 
+          {/* SelfService — Todos los roles autenticados */}
           <Route
             path="/selfservice"
             element={
@@ -133,6 +133,7 @@ function AppContent() {
             }
           />
 
+          {/* Logs — SOLO Administrador */}
           <Route
             path="/logs"
             element={
@@ -144,6 +145,7 @@ function AppContent() {
 
           <Route path="/acceso-denegado" element={<AccesoDenegado />} />
         </Routes>
+
       </main>
     </div>
   );

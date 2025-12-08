@@ -4,10 +4,22 @@ import logo from "../assets/logo.png";
 
 function Sidebar() {
   const { instance, accounts } = useMsal();
-
+  const rolUsuario = localStorage.getItem("usuario_rol"); 
   const handleLogout = () => {
     instance.logoutPopup().catch((e) => console.error("Logout error:", e));
+    localStorage.removeItem("usuario_rol");
   };
+
+  const links = [
+    { to: "/", label: "Empleados", roles: ["Administrador", "RRHH"] },
+    { to: "/clinicas", label: "Clínicas", roles: ["Administrador", "RRHH"] },
+    { to: "/estados", label: "Estados", roles: ["Administrador", "RRHH"] },
+    { to: "/sso", label: "SSO Microsoft", roles: ["Administrador", "RRHH"] },
+    { to: "/selfservice", label: "Self-Service", roles: ["Administrador", "RRHH", "Empleado de planta"] },
+    { to: "/logs", label: "Logs de Acciones", roles: ["Administrador"] },
+  ];
+
+  const linksVisibles = links.filter(link => link.roles.includes(rolUsuario));
 
   return (
     <aside className="w-64 bg-white shadow-md p-4 flex flex-col h-screen">
@@ -17,24 +29,15 @@ function Sidebar() {
       </div>
 
       <nav className="space-y-2 flex-1">
-        <Link to="/" className="block p-2 rounded hover:bg-blue-100 text-center">
-          Empleados
-        </Link>
-        <Link to="/clinicas" className="block p-2 rounded hover:bg-blue-100 text-center">
-          Clínicas
-        </Link>
-        <Link to="/estados" className="block p-2 rounded hover:bg-blue-100 text-center">
-          Estados
-        </Link>
-        <Link to="/sso" className="block p-2 rounded hover:bg-blue-100 text-center">
-          SSO Microsoft
-        </Link>
-        <Link to="/selfservice" className="block p-2 rounded hover:bg-blue-100 text-center">
-          Self-Service
-        </Link>
-        <Link to="/logs" className="block p-2 rounded hover:bg-blue-100 text-center">
-          Logs de Acciones
-        </Link>
+        {linksVisibles.map(link => (
+          <Link
+            key={link.to}
+            to={link.to}
+            className="block p-2 rounded hover:bg-blue-100 text-center"
+          >
+            {link.label}
+          </Link>
+        ))}
       </nav>
 
       <div className="mt-6 text-center">
