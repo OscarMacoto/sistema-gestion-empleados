@@ -3,15 +3,19 @@ import axios from "axios";
 import { useMsal } from "@azure/msal-react";
 
 
-const SelectInput = ({ name, value, onChange, options, placeholder }) => {
+const SelectInput = ({ name, value, onChange, options, placeholder, disabled }) => {
   const getId = (opt) => opt.id_estado || opt.id_clinica || opt.id_rol;
   const getLabel = (opt) => opt.descripcion || opt.nombre_clinica || opt.nombre_rol;
+
   return (
     <select
       name={name}
       value={value}
       onChange={onChange}
-      className="p-2 border rounded text-sm"
+      disabled={disabled}
+      className={`p-2 border rounded text-sm ${
+        disabled ? "bg-gray-200 cursor-not-allowed" : ""
+      }`}
     >
       <option value="">{placeholder}</option>
       {options.map((opt) => (
@@ -22,6 +26,7 @@ const SelectInput = ({ name, value, onChange, options, placeholder }) => {
     </select>
   );
 };
+
 
 const FotoInput = ({ foto, setFoto }) => {
   const handleChange = (e) => {
@@ -66,7 +71,7 @@ const Empleado = () => {
     direccion: "",
     id_estado: "",
     id_clinica: "",
-    id_rol: "",
+    id_rol: 3,
     foto: null,
   });
   const [empleadoEditando, setEmpleadoEditando] = useState(null);
@@ -355,13 +360,15 @@ const eliminarEmpleado = async (id) => {
 
   const rolActual = localStorage.getItem("usuario_rol");
   const exportarDeshabilitado = rolActual === "RRHH";
+  const rolDeshabilitado = rolActual !== "Administrador";
+
 
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold text-center mb-6">Gestión de Empleados</h2>
-      <p className="mb-4 text-right text-gray-700">
+      {/* <p className="mb-4 text-right text-gray-700">
         Usuario actual: {usuarioActivo.nombre || "Sistema"}
-      </p>
+      </p> */}
 
       {/* BOTONES DE ACCIONES */}
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
@@ -439,8 +446,10 @@ const eliminarEmpleado = async (id) => {
               value={nuevoEmpleado.id_rol}
               onChange={handleChangeNuevo}
               options={roles}
-              placeholder="Seleccione Rol..."
+              placeholder="Selecciona un rol"
+              disabled={rolDeshabilitado}
             />
+
             <FotoInput
               foto={nuevoEmpleado.foto}
               setFoto={(foto) => setNuevoEmpleado({ ...nuevoEmpleado, foto })}
@@ -484,13 +493,15 @@ const eliminarEmpleado = async (id) => {
             />
             <SelectInput
               name="id_rol"
-              value={empleadoEditando.id_rol}
+              value={nuevoEmpleado.id_rol}
               onChange={(e) =>
-                setEmpleadoEditando({ ...empleadoEditando, id_rol: e.target.value })
+                setNuevoEmpleado({ ...nuevoEmpleado, id_rol: e.target.value })
               }
               options={roles}
               placeholder="Seleccione Rol..."
+              disabled={rolDeshabilitado}
             />
+
             <input
               type="text"
               name="telefono"
