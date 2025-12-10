@@ -280,7 +280,7 @@ const eliminarEmpleado = async (id) => {
   try {
     await axios.delete(`http://localhost:5000/api/empleados/${id}`, {
       data: {
-        usuario_email: usuarioActivo.correo || "Sistema", // ← tu variable del login
+        usuario_email: usuarioActivo.correo || "Sistema",
       },
     });
 
@@ -366,10 +366,7 @@ const eliminarEmpleado = async (id) => {
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold text-center mb-6">Gestión de Empleados</h2>
-      {/* <p className="mb-4 text-right text-gray-700">
-        Usuario actual: {usuarioActivo.nombre || "Sistema"}
-      </p> */}
-
+      
       {/* BOTONES DE ACCIONES */}
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <button

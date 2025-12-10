@@ -9,6 +9,8 @@ import clinicasRouter from "./routes/clinicas.js";
 import estadosRouter from "./routes/estados.js";
 import ssoRouter from "./routes/sso.js";
 import rolesRouter from "./routes/roles.js";
+import authRoutes from "./routes/auth.js";
+
 
 const app = express();
 const PORT = 5000;
@@ -25,6 +27,8 @@ app.use("/api/clinicas", clinicasRouter);
 app.use("/api/estados", estadosRouter);
 app.use("/api/sso", ssoRouter);
 app.use("/api/roles", rolesRouter);
+app.use("/api/auth", authRoutes);
+
 
 // Inicialización del servidor con conexión a la DB
 (async () => {

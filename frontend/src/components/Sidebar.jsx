@@ -1,13 +1,23 @@
 import { Link } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
+import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
 
 function Sidebar() {
   const { instance, accounts } = useMsal();
-  const rolUsuario = localStorage.getItem("usuario_rol"); 
+
+  const [rolUsuario, setRolUsuario] = useState(null); // 👈 manejamos el rol en estado
+
+  useEffect(() => {
+    const rol = localStorage.getItem("usuario_rol");
+    setRolUsuario(rol);
+  }, []);
+
   const handleLogout = () => {
     instance.logoutPopup().catch((e) => console.error("Logout error:", e));
     localStorage.removeItem("usuario_rol");
+    localStorage.removeItem("usuario_email");
+    localStorage.removeItem("usuario_nombre");
   };
 
   const links = [
@@ -15,11 +25,20 @@ function Sidebar() {
     { to: "/clinicas", label: "Clínicas", roles: ["Administrador", "RRHH"] },
     { to: "/estados", label: "Estados", roles: ["Administrador", "RRHH"] },
     { to: "/sso", label: "SSO Microsoft", roles: ["Administrador", "RRHH"] },
-    { to: "/selfservice", label: "Self-Service", roles: ["Administrador", "RRHH", "Empleado de planta"] },
+    {
+      to: "/selfservice",
+      label: "Self-Service",
+      roles: ["Administrador", "RRHH", "Empleado de planta"],
+    },
     { to: "/logs", label: "Logs de Acciones", roles: ["Administrador"] },
   ];
 
-  const linksVisibles = links.filter(link => link.roles.includes(rolUsuario));
+  // 🚫 Mientras no sepamos el rol, NO renderizar Sidebar (evita pantalla en blanco)
+  if (rolUsuario === null) return null;
+
+  const linksVisibles = links.filter((link) =>
+    link.roles.includes(rolUsuario)
+  );
 
   return (
     <aside className="w-64 bg-white shadow-md p-4 flex flex-col h-screen">
@@ -29,7 +48,7 @@ function Sidebar() {
       </div>
 
       <nav className="space-y-2 flex-1">
-        {linksVisibles.map(link => (
+        {linksVisibles.map((link) => (
           <Link
             key={link.to}
             to={link.to}

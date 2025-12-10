@@ -6,13 +6,34 @@ function LoginMicrosoft() {
   const { instance, accounts } = useMsal();
   const navigate = useNavigate();
 
+  // si ya hay sesión iniciada, obtener rol y redirigir correctamente
   useEffect(() => {
-    // Si ya hay sesión, establecer usuario activo
-    if (accounts.length > 0) {
-      instance.setActiveAccount(accounts[0]);
-      navigate("/selfservice");
-    }
+    const iniciarSesionExistente = async () => {
+      if (accounts.length > 0) {
+        instance.setActiveAccount(accounts[0]);
+
+        const email = accounts[0].username;
+
+        // Obtener rol del usuario
+        const rolResponse = await fetch(
+          `http://localhost:5000/api/empleados/rol/${email}`
+        );
+        const rolData = await rolResponse.json();
+        const rol = rolData?.descripcion || "Empleado";
+
+        localStorage.setItem("usuario_rol", rol);
+
+        if (rol === "Empleado de planta") {
+          navigate("/selfservice");
+        } else {
+          navigate("/");
+        }
+      }
+    };
+
+    iniciarSesionExistente();
   }, [accounts, instance, navigate]);
+
 
   const handleLogin = async () => {
     try {
@@ -22,40 +43,47 @@ function LoginMicrosoft() {
       });
 
       const account = response.account;
-
       instance.setActiveAccount(account);
 
       const email = account.username;
       const nombreCompleto = account.name;
-      const empleadoResponse = await fetch(
+
+      // Obtener info del empleado
+      const empleadoRes = await fetch(
         `http://localhost:5000/api/empleados/email/${email}`
       );
-      const empleadoData = await empleadoResponse.json();
+      const empleadoData = await empleadoRes.json();
 
-      if (!empleadoData?.id_empleado) {
-        alert("No tienes acceso al sistema. Contacta con RRHH.");
-        return;
-      }
-
-      // Buscar el rol del empleado
-      const rolResponse = await fetch(
+      // Obtener rol
+      const rolRes = await fetch(
         `http://localhost:5000/api/empleados/rol/${email}`
       );
-      const rolData = await rolResponse.json();
+      const rolData = await rolRes.json();
 
-      // Guardar en localStorage
+      const rol = rolData?.descripcion || "Empleado";
+      localStorage.setItem("usuario_rol", rolData?.descripcion || "Empleado");
+      window.dispatchEvent(new Event("role-updated"));
+
+
+      // Guardar datos
       localStorage.setItem("usuario_email", email);
       localStorage.setItem("usuario_nombre", nombreCompleto);
-      localStorage.setItem("usuario_rol", rolData?.descripcion || "Empleado");
+      localStorage.setItem("usuario_rol", rol);
 
       // Actualizar último login
-      await fetch("http://localhost:5000/api/sso/actualizar-login", {
+      await fetch("http://localhost:5000/api/auth/actualizar-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id_empleado: empleadoData.id_empleado }),
       });
 
-      navigate("/selfservice");
+      // 🔥 Redirección correcta
+      if (rol === "Empleado de planta") {
+        navigate("/selfservice");
+      } else {
+        navigate("/");
+      }
+
     } catch (error) {
       console.error("Error en login:", error);
     }
