@@ -143,16 +143,19 @@ const Empleado = () => {
     texto?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() || "";
 
   const empleadosFiltrados = empleados.filter(
-    (e) =>
-      normalizar(e.nombre).includes(normalizar(filtroNombre)) &&
-      (filtroEstado === "" || e.id_estado === Number(filtroEstado)) &&
-      (filtroClinica === "" || e.id_clinica === Number(filtroClinica))
-  );
+  (e) =>
+    normalizar(e.nombre).includes(normalizar(filtroNombre)) &&
+    (filtroEstado === "" || e.id_estado === Number(filtroEstado)) &&
+    (filtroClinica === "" || e.id_clinica === Number(filtroClinica))
+);
 
-  const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
-  const indiceUltimo = paginaActual * empleadosPorPagina;
-  const indicePrimero = indiceUltimo - empleadosPorPagina;
-  const empleadosActuales = empleadosFiltrados.slice(indicePrimero, indiceUltimo);
+
+    const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
+    const indiceUltimo = paginaActual * empleadosPorPagina;
+    const indicePrimero = indiceUltimo - empleadosPorPagina;
+    const empleadosActuales = empleadosFiltrados.slice(indicePrimero, indiceUltimo);
+
+
 
   const formatFecha = (fecha) => {
     if (!fecha) return "";
@@ -352,6 +355,77 @@ const eliminarEmpleado = async (id) => {
       setCargandoImport(false);
     }
   };
+
+  const Paginacion = ({ totalPaginas, paginaActual, setPaginaActual }) => {
+  const maxBotones = 7; // número máximo de botones visibles
+
+  const getRangoPaginas = () => {
+    let start = Math.max(1, paginaActual - Math.floor(maxBotones / 2));
+    let end = start + maxBotones - 1;
+
+    if (end > totalPaginas) {
+      end = totalPaginas;
+      start = Math.max(1, end - maxBotones + 1);
+    }
+
+    const paginas = [];
+    for (let i = start; i <= end; i++) paginas.push(i);
+    return paginas;
+  };
+
+  const paginas = getRangoPaginas();
+
+  return (
+    <div className="flex justify-center mt-4 gap-2 flex-wrap">
+      <button
+        onClick={() => setPaginaActual(1)}
+        disabled={paginaActual === 1}
+        className="px-3 py-1 rounded bg-gray-200"
+      >
+        {"<<"}
+      </button>
+      <button
+        onClick={() => setPaginaActual(paginaActual - 1)}
+        disabled={paginaActual === 1}
+        className="px-3 py-1 rounded bg-gray-200"
+      >
+        {"<"}
+      </button>
+
+      {paginas[0] > 1 && <span className="px-2">...</span>}
+
+      {paginas.map((num) => (
+        <button
+          key={num}
+          className={`px-3 py-1 rounded ${
+            num === paginaActual ? "bg-blue-600 text-white" : "bg-gray-200"
+          }`}
+          onClick={() => setPaginaActual(num)}
+        >
+          {num}
+        </button>
+      ))}
+
+      {paginas[paginas.length - 1] < totalPaginas && <span className="px-2">...</span>}
+
+      <button
+        onClick={() => setPaginaActual(paginaActual + 1)}
+        disabled={paginaActual === totalPaginas}
+        className="px-3 py-1 rounded bg-gray-200"
+      >
+        {">"}
+      </button>
+      <button
+        onClick={() => setPaginaActual(totalPaginas)}
+        disabled={paginaActual === totalPaginas}
+        className="px-3 py-1 rounded bg-gray-200"
+      >
+        {">>"}
+      </button>
+    </div>
+  );
+};
+
 
   // LIMPIAR FILTROS
 
@@ -633,21 +707,13 @@ const eliminarEmpleado = async (id) => {
           </tbody>
         </table>
       </div>
-
+      
       {/* PAGINACION */}
-      <div className="flex justify-center mt-4 gap-2 flex-wrap">
-        {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((num) => (
-          <button
-            key={num}
-            className={`px-3 py-1 rounded ${
-              num === paginaActual ? "bg-blue-600 text-white" : "bg-gray-200"
-            }`}
-            onClick={() => setPaginaActual(num)}
-          >
-            {num}
-          </button>
-        ))}
-      </div>
+      <Paginacion
+        totalPaginas={totalPaginas}
+        paginaActual={paginaActual}
+        setPaginaActual={setPaginaActual}
+      />
     </div>
   );
 };

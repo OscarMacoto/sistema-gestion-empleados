@@ -2,13 +2,23 @@ import express from "express";
 import { connectDB, sql } from "../db.js";
 import ExcelJS from "exceljs";
 
-const router = express.Router(); 
+const router = express.Router();
 
-const parseDesde = (fechaStr) => fechaStr ? new Date(new Date(fechaStr).setHours(0, 0, 0, 0)) : null;
-const parseHasta = (fechaStr) => fechaStr ? new Date(new Date(fechaStr).setHours(23, 59, 59, 999)) : null;
+
+const parseDesde = (fechaStr) => {
+  if (!fechaStr) return null;
+  const fecha = new Date(fechaStr + "T00:00:00Z");
+  return fecha;
+};
+
+const parseHasta = (fechaStr) => {
+  if (!fechaStr) return null;
+  const fecha = new Date(fechaStr + "T00:00:00Z"); 
+  fecha.setUTCDate(fecha.getUTCDate() + 1);
+  return fecha;
+};
 
 // GET /logs
-
 router.get("/", async (req, res) => {
   const { desde, hasta } = req.query;
 
@@ -30,11 +40,10 @@ router.get("/", async (req, res) => {
     if (hasta) {
       const fechaHasta = parseHasta(hasta);
       request.input("hasta", sql.DateTime2, fechaHasta);
-      query += " AND fecha <= @hasta";
+      query += " AND fecha < @hasta";
     }
 
     query += " ORDER BY fecha DESC";
-
     const result = await request.query(query);
     res.json(result.recordset);
   } catch (error) {
@@ -43,8 +52,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET /logs/
-
+// GET /logs/exportar
 router.get("/exportar", async (req, res) => {
   const { desde, hasta } = req.query;
 
@@ -66,14 +74,12 @@ router.get("/exportar", async (req, res) => {
     if (hasta) {
       const fechaHasta = parseHasta(hasta);
       request.input("hasta", sql.DateTime2, fechaHasta);
-      query += " AND fecha <= @hasta";
+      query += " AND fecha < @hasta";
     }
 
     query += " ORDER BY fecha DESC";
-
     const result = await request.query(query);
 
-    // Crear Excel
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Logs");
 
@@ -104,5 +110,6 @@ router.get("/exportar", async (req, res) => {
     res.status(500).json({ error: "Error al exportar registros" });
   }
 });
+
 
 export default router;

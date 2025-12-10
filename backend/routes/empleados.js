@@ -216,19 +216,20 @@ router.get("/exportar", async (req, res) => {
     const usuarioActual = auth.usuario;
 
     // GET empleados
-    
     const result = await pool.request().query(`
       SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
-             e.telefono, e.direccion,
-             c.nombre_clinica AS clinica,
-             est.descripcion AS estado,
-             r.descripcion AS rol
+            e.telefono, e.direccion,
+            c.nombre_clinica AS clinica,
+            est.descripcion AS estado,
+            r.descripcion AS rol
       FROM Empleado e
       LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
       LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
       LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
-      ORDER BY e.id_empleado
+      ORDER BY e.id_empleado;
     `);
+
+    res.json({ empleados: result.recordset });
 
     // Registrar acción en RRHH_RegistroAcciones
     await pool
@@ -357,7 +358,7 @@ router.get("/", async (req, res) => {
     if (!auth.ok) return res.status(403).json({ error: auth.error });
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 1000));
+    const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit) || 10000));
     const offset = (page - 1) * limit;
 
     const filterEstado = req.query.estado ? Number(req.query.estado) : null;
