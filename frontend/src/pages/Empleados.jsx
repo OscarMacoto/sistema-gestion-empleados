@@ -241,13 +241,16 @@ const Empleado = () => {
     if (!empleadoEditando.id_estado || !empleadoEditando.id_clinica)
       return alert("Debes seleccionar Estado y Clínica.");
 
-    const estadoSeleccionado = estados.find(
-      (e) => e.id_estado === empleadoEditando.id_estado
-    );
-    const fechaSalida =
-      ["Despedido", "Renuncia"].includes(estadoSeleccionado?.descripcion)
-        ? new Date()
-        : null;
+     const estadosConSalida = [2, 3]; 
+
+    const generarFechaActual = () => {
+    const fecha = new Date();
+    return fecha.toISOString().slice(0, 10); 
+  };
+
+     const fechaSalida = estadosConSalida.includes(Number(empleadoEditando.id_estado))
+    ? generarFechaActual()
+    : null;
 
     try {
       await axios.put(
@@ -386,8 +389,8 @@ const eliminarEmpleado = async (id) => {
               : "bg-green-500 hover:bg-green-600"
               }`}
 >
-  Exportar Excel
-</button>
+            Exportar Excel
+          </button>
 
           <button
             onClick={() => inputFileRef.current.click()}
