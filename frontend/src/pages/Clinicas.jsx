@@ -107,7 +107,7 @@ function Clinicas() {
         </thead>
         <tbody>
           {filtrados.slice(inicio, fin).map(c => (
-            <tr key={c.id_clinica} className="border-b hover:bg-gray-100">
+            <tr key={c.id_clinica} className="border-b hover:bg-blue-100">
               <td className="py-2">{c.id_clinica}</td>
               <td className="py-2">{c.nombre_clinica}</td>
             </tr>

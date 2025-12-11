@@ -45,7 +45,6 @@ function SelfService() {
     );
   }
 
-  // Función para mostrar valor o texto por defecto si está vacío
   const mostrar = (valor, defecto = "No registrado") => valor || defecto;
 
   return (

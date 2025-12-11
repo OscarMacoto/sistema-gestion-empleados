@@ -346,7 +346,7 @@ const eliminarEmpleado = async (id) => {
       await axios.post("http://localhost:5000/api/empleados/importar", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      alert("Empleados importados correctamente (si la ruta existe en backend).");
+      alert("Empleados importados correctamente.");
       obtenerEmpleados();
     } catch (error) {
       console.error("Error al importar Excel:", error);
@@ -488,7 +488,7 @@ const eliminarEmpleado = async (id) => {
 
       {/* FORMULARIO NUEVO EMPLEADO */}
       {mostrarFormulario && (
-        <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-6">
+        <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
           <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
           <div className="grid grid-cols-2 gap-4">
             {["nombre", "DNI", "correo", "telefono", "direccion"].map((f) => (
@@ -655,22 +655,22 @@ const eliminarEmpleado = async (id) => {
         <table className="w-full border border-gray-300 text-left text-sm">
           <thead>
             <tr className="bg-gray-200">
-              <th className="p-2 border">Nombre</th>
-              <th className="p-2 border">DNI</th>
-              <th className="p-2 border">Correo</th>
-              <th className="p-2 border">Teléfono</th>
-              <th className="p-2 border">Dirección</th>
-              <th className="p-2 border">Estado</th>
-              <th className="p-2 border">Clínica</th>
-              <th className="p-2 border">Rol</th>
-              <th className="p-2 border">Fecha ingreso</th>
-              <th className="p-2 border">Fecha salida</th>
-              <th className="p-2 border">Acciones</th>
+              <th className="p-2 border text-center">Nombre</th>
+              <th className="p-2 border text-center">DNI</th>
+              <th className="p-2 border text-center">Correo</th>
+              <th className="p-2 border text-center">Teléfono</th>
+              <th className="p-2 border text-center">Dirección</th>
+              <th className="p-2 border text-center">Estado</th>
+              <th className="p-2 border text-center">Clínica</th>
+              <th className="p-2 border text-center">Rol</th>
+              <th className="p-2 border text-center">Fecha ingreso</th>
+              <th className="p-2 border text-center">Fecha salida</th>
+              <th className="p-2 border text-center">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {empleadosActuales.map((emp) => (
-              <tr key={emp.id_empleado} className="hover:bg-gray-100">
+              <tr key={emp.id_empleado} className="hover:bg-blue-100">
                 <td className="p-2 border">{emp.nombre}</td>
                 <td className="p-2 border">{emp.DNI}</td>
                 <td className="p-2 border">{emp.correo}</td>

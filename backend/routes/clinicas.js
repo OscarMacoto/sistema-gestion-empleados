@@ -38,7 +38,6 @@ router.post("/", async (req, res) => {
         VALUES (@nombre_clinica)
       `);
 
-    // Devolver la clínica recién creada
     res.status(201).json(insertResult.recordset[0]);
   } catch (err) {
     console.error("Error al agregar clínica:", err);

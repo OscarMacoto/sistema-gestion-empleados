@@ -44,7 +44,7 @@ function Estados() {
         </thead>
         <tbody>
           {filtrados.slice(inicio, fin).map(e => (
-            <tr key={e.id_estado} className="border-b hover:bg-gray-100">
+            <tr key={e.id_estado} className="border-b hover:bg-blue-100">
               <td className="py-2">{e.id_estado}</td>
               <td className="py-2">{e.estado}</td>
             </tr>

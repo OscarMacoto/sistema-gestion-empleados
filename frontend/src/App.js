@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { MsalProvider, useIsAuthenticated, useMsal } from "@azure/msal-react";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { useState, useEffect } from "react";
-
 import Logs from "./pages/Logs.jsx";
 import Empleados from "./pages/Empleados";
 import Clinicas from "./pages/Clinicas";

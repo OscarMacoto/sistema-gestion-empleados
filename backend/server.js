@@ -1,8 +1,6 @@
 import express from "express";
 import cors from "cors";
 import { connectDB } from "./db.js";
-
-// Importar routers
 import logsRouter from "./routes/logs.js";
 import empleadosRouter from "./routes/empleados.js";
 import clinicasRouter from "./routes/clinicas.js";
@@ -15,12 +13,9 @@ import authRoutes from "./routes/auth.js";
 const app = express();
 const PORT = 5000;
 
-// Middlewares
 app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// Rutas principales
 app.use("/api/logs", logsRouter);
 app.use("/api/empleados", empleadosRouter);
 app.use("/api/clinicas", clinicasRouter);
@@ -30,7 +25,6 @@ app.use("/api/roles", rolesRouter);
 app.use("/api/auth", authRoutes);
 
 
-// Inicialización del servidor con conexión a la DB
 (async () => {
   try {
     await connectDB();

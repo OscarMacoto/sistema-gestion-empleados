@@ -43,7 +43,7 @@ function SSO() {
         </thead>
         <tbody className="text-center">
           {filtrados.slice(inicio, fin).map((u) => (
-            <tr key={u.id_empleado} className="border-b hover:bg-gray-100">
+            <tr key={u.id_empleado} className="border-b hover:bg-blue-100">
               <td className="py-2">{u.id_empleado}</td>
               <td className="py-2">{u.nombre}</td>
               <td className="py-2">{u.L_login.slice(0,10)}</td>

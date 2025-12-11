@@ -209,8 +209,6 @@ router.get("/exportar", async (req, res) => {
   try {
     const usuario_email = req.query.usuario_email ?? "";
     const pool = await connectDB();
-
-    // Verificar roles
     const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
     if (!auth.ok) return res.status(403).json({ error: auth.error });
     const usuarioActual = auth.usuario;
@@ -231,7 +229,7 @@ router.get("/exportar", async (req, res) => {
 
     res.json({ empleados: result.recordset });
 
-    // Registrar acción en RRHH_RegistroAcciones
+    // Registrar acción
     await pool
       .request()
       .input("id_empleado", sql.Int, usuarioActual.id_empleado)
@@ -290,8 +288,6 @@ router.post("/exportar", async (req, res) => {
       empleadosList = result.recordset;
     }
 
-    // Registrar acción si tenemos usuarioActual
-
     if (usuarioActual) {
       await pool
         .request()
@@ -343,8 +339,6 @@ router.get("/mi-perfil/:correo", async (req, res) => {
     res.status(500).json({ error: "Error al obtener perfil" });
   }
 });
-
-
 
 // LISTA
 

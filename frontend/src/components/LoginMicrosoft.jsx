@@ -6,7 +6,6 @@ function LoginMicrosoft() {
   const { instance, accounts } = useMsal();
   const navigate = useNavigate();
 
-  // si ya hay sesión iniciada, obtener rol y redirigir correctamente
   useEffect(() => {
     const iniciarSesionExistente = async () => {
       if (accounts.length > 0) {
@@ -14,7 +13,6 @@ function LoginMicrosoft() {
 
         const email = accounts[0].username;
 
-        // Obtener rol del usuario
         const rolResponse = await fetch(
           `http://localhost:5000/api/empleados/rol/${email}`
         );
@@ -48,7 +46,6 @@ function LoginMicrosoft() {
       const email = account.username;
       const nombreCompleto = account.name;
 
-      // Obtener info del empleado
       const empleadoRes = await fetch(
         `http://localhost:5000/api/empleados/email/${email}`
       );
@@ -77,7 +74,6 @@ function LoginMicrosoft() {
         body: JSON.stringify({ id_empleado: empleadoData.id_empleado }),
       });
 
-      // 🔥 Redirección correcta
       if (rol === "Empleado de planta") {
         navigate("/selfservice");
       } else {
