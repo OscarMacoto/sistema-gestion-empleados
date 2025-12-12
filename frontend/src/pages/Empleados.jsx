@@ -163,60 +163,80 @@ const Empleado = () => {
     return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
   };
 
-  // ADD (POST) EMPLEADO
- 
-  const handleChangeNuevo = (e) =>
-    setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: e.target.value });
+// ADD (POST) EMPLEADO
+const handleChangeNuevo = (e) => {
+  let value = e.target.value;
 
-  const agregarEmpleado = async () => {
-    if (
-      !nuevoEmpleado.nombre ||
-      !nuevoEmpleado.DNI ||
-      !nuevoEmpleado.correo ||
-      !nuevoEmpleado.id_estado ||
-      !nuevoEmpleado.id_clinica
-    )
-      return alert("Por favor completa todos los campos obligatorios.");
+  if (e.target.name === "DNI") {
+    value = value.replace(/[^0-9 -]/g, "");
+  }
 
-    const estadoSeleccionado = estados.find(
-      (e) => e.id_estado === nuevoEmpleado.id_estado
-    );
-    const fechaSalida =
-      ["Despedido", "Renuncia"].includes(estadoSeleccionado?.descripcion)
-        ? new Date()
-        : null;
+  if (e.target.name === "telefono") {
+    value = value.replace(/[^0-9-]/g, "");
+  }
 
-    const empleadoAGuardar = {
-      ...nuevoEmpleado,
-      id_rol:
-        Number(nuevoEmpleado.id_rol) ||
-        roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
-        3,
-      usuario_email: usuarioActivo.correo,
-      fecha_salida: fechaSalida,
-    };
+  setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: value });
+};
 
-    try {
-      await axios.post("http://localhost:5000/api/empleados", empleadoAGuardar);
-      alert("Empleado agregado correctamente.");
-      setNuevoEmpleado({
-        nombre: "",
-        DNI: "",
-        correo: "",
-        telefono: "",
-        direccion: "",
-        id_estado: "",
-        id_clinica: "",
-        id_rol: "",
-        foto: null,
-      });
-      setMostrarFormulario(false);
-      obtenerEmpleados();
-    } catch (error) {
-      console.error("Error al agregar empleado:", error);
-      alert(error.response?.data?.error || "Error al agregar empleado.");
-    }
+const agregarEmpleado = async () => {
+  if (
+    !nuevoEmpleado.nombre ||
+    !nuevoEmpleado.DNI ||
+    !nuevoEmpleado.correo ||
+    !nuevoEmpleado.id_estado ||
+    !nuevoEmpleado.id_clinica
+  )
+    return alert("Por favor completa todos los campos obligatorios.");
+
+  const dniRegex = /^(\d{4}[- ]\d{4}[- ]\d{5})$/;
+  if (!dniRegex.test(nuevoEmpleado.DNI)) {
+    return alert("DNI inválido. Debe tener formato xxxx xxxx xxxxx o xxxx-xxxx-xxxxx");
+  }
+
+  const telefonoNormalizado = nuevoEmpleado.telefono.replace(/-/g, "");
+
+  const estadoSeleccionado = estados.find(
+    (e) => e.id_estado === nuevoEmpleado.id_estado
+  );
+  const fechaSalida =
+    ["Despedido", "Renuncia"].includes(estadoSeleccionado?.descripcion)
+      ? new Date()
+      : null;
+
+  const empleadoAGuardar = {
+    ...nuevoEmpleado,
+    telefono: telefonoNormalizado,
+    id_rol:
+      Number(nuevoEmpleado.id_rol) ||
+      roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
+      3,
+    usuario_email: usuarioActivo.correo,
+    fecha_salida: fechaSalida,
   };
+
+  try {
+    await axios.post("http://localhost:5000/api/empleados", empleadoAGuardar);
+    alert("Empleado agregado correctamente.");
+    setNuevoEmpleado({
+      nombre: "",
+      DNI: "",
+      correo: "",
+      telefono: "",
+      direccion: "",
+      id_estado: "",
+      id_clinica: "",
+      id_rol: "",
+      foto: null,
+    });
+    setMostrarFormulario(false);
+    obtenerEmpleados();
+  } catch (error) {
+    console.error("Error al agregar empleado:", error);
+    alert(error.response?.data?.error || "Error al agregar empleado.");
+  }
+};
+
+
 
   const seleccionarEmpleado = (empleado) => {
     setEmpleadoEditando({
@@ -357,7 +377,7 @@ const eliminarEmpleado = async (id) => {
   };
 
   const Paginacion = ({ totalPaginas, paginaActual, setPaginaActual }) => {
-  const maxBotones = 7; // número máximo de botones visibles
+  const maxBotones = 7;
 
   const getRangoPaginas = () => {
     let start = Math.max(1, paginaActual - Math.floor(maxBotones / 2));
