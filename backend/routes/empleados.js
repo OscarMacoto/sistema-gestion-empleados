@@ -357,6 +357,8 @@ router.get("/", async (req, res) => {
 
     const filterEstado = req.query.estado ? Number(req.query.estado) : null;
     const filterClinica = req.query.clinica ? Number(req.query.clinica) : null;
+
+
     const whereClauses = [];
     if (filterEstado) whereClauses.push(`e.id_estado = ${filterEstado}`);
     if (filterClinica) whereClauses.push(`e.id_clinica = ${filterClinica}`);

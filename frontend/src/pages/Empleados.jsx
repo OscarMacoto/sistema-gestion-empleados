@@ -83,6 +83,8 @@ const Empleado = () => {
   const inputFileRef = useRef(null);
   const [cargandoImport, setCargandoImport] = useState(false);
 
+
+
   // GET USUARIO ACTIVO
 
   useEffect(() => {
@@ -355,26 +357,33 @@ const eliminarEmpleado = async (id) => {
   }
 };
 
+const importarExcel = async (file) => {
+  if (cargandoImport) return;
+  if (!file) return alert("Selecciona un archivo primero.");
 
-  const importarExcel = async (file) => {
-    if (!file) return alert("Selecciona un archivo primero.");
-    setCargandoImport(true);
-    try {
-      const formData = new FormData();
-      formData.append("archivo", file);
-      formData.append("usuario_email", usuarioActivo.correo);
-      await axios.post("http://localhost:5000/api/empleados/importar", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      alert("Empleados importados correctamente.");
-      obtenerEmpleados();
-    } catch (error) {
-      console.error("Error al importar Excel:", error);
-      alert("No se pudo importar el archivo. Verifica que la ruta exista en backend.");
-    } finally {
-      setCargandoImport(false);
-    }
-  };
+  setCargandoImport(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("archivo", file);
+    formData.append("usuario_email", usuarioActivo.correo);
+
+    await axios.post(
+      "http://localhost:5000/api/empleados/importar",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    alert("Empleados importados correctamente.");
+    obtenerEmpleados();
+    // setArchivoSeleccionado(null);
+  } catch (error) {
+    console.error("Error al importar Excel:", error);
+    alert("No se pudo importar el archivo. Verifica el formato del Excel.");
+  } finally {
+    setCargandoImport(false);
+  }
+};
 
   const Paginacion = ({ totalPaginas, paginaActual, setPaginaActual }) => {
   const maxBotones = 7;
@@ -446,7 +455,6 @@ const eliminarEmpleado = async (id) => {
   );
 };
 
-
   // LIMPIAR FILTROS
 
   const limpiarFiltros = () => {
@@ -458,7 +466,6 @@ const eliminarEmpleado = async (id) => {
   const rolActual = localStorage.getItem("usuario_rol");
   const exportarDeshabilitado = rolActual === "RRHH";
   const rolDeshabilitado = rolActual !== "Administrador";
-
 
   return (
     <div className="p-4">
@@ -474,37 +481,54 @@ const eliminarEmpleado = async (id) => {
         </button>
 
         <div className="flex gap-2 flex-wrap">
+          {/* EXPORTAR */}
           <button
             onClick={exportarExcel}
             disabled={exportarDeshabilitado}
             className={`px-4 py-2 rounded text-white 
-               ${exportarDeshabilitado 
-              ? "bg-gray-400 cursor-not-allowed" 
-              : "bg-green-500 hover:bg-green-600"
+              ${
+                exportarDeshabilitado
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600"
               }`}
->
+          >
             Exportar Excel
           </button>
 
+          {/* IMPORTAR */}
           <button
-            onClick={() => inputFileRef.current.click()}
+            onClick={() => {
+              if (!cargandoImport) {
+                inputFileRef.current.click();
+              }
+            }}
             disabled={cargandoImport}
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            className={`px-4 py-2 rounded text-white
+              ${
+                cargandoImport
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600"
+              }`}
           >
             {cargandoImport ? "Importando..." : "Importar Excel"}
           </button>
+
           <input
             type="file"
             ref={inputFileRef}
+            accept=".xlsx,.xls"
             style={{ display: "none" }}
+            disabled={cargandoImport}
             onChange={async (e) => {
               const file = e.target.files[0];
-              if (!file) return;
+              if (!file || cargandoImport) return;
               await importarExcel(file);
+              e.target.value = "";
             }}
           />
         </div>
       </div>
+
 
       {/* FORMULARIO NUEVO EMPLEADO */}
       {mostrarFormulario && (
@@ -601,11 +625,16 @@ const eliminarEmpleado = async (id) => {
               name="telefono"
               placeholder="Teléfono"
               value={empleadoEditando.telefono || ""}
-              onChange={(e) =>
-                setEmpleadoEditando({ ...empleadoEditando, telefono: e.target.value })
-              }
+              onChange={(e) => {
+                const valor = e.target.value.replace(/[^0-9-]/g, "");
+                setEmpleadoEditando({
+                  ...empleadoEditando,
+                  telefono: valor,
+                });
+              }}
               className="p-2 border rounded text-sm"
             />
+
             <input
               type="text"
               name="direccion"
