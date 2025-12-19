@@ -323,13 +323,16 @@ const eliminarEmpleado = async (id) => {
 
   const exportarExcel = async () => {
   try {
-    const empleadosSinFoto = empleados.map(({ foto, ...resto }) => resto);
-    const res = await axios.post(
+    const res = await axios.get(
       "http://localhost:5000/api/empleados/exportar",
-      empleadosSinFoto,
       {
+        params: {
+          usuario_email: usuarioActivo.correo,
+          nombre: filtroNombre,
+          estado: filtroEstado,
+          clinica: filtroClinica,
+        },
         responseType: "blob",
-        headers: { "Content-Type": "application/json" },
       }
     );
 
@@ -341,19 +344,12 @@ const eliminarEmpleado = async (id) => {
     link.click();
     link.remove();
 
-    await axios.post("http://localhost:5000/api/empleados/registrarAccion", {
-      usuario_email: usuarioActivo.correo,
-      accion: "Exportar Usuarios",
-      detalles: `El usuario ${usuarioActivo.nombre} exportó la lista de empleados`,
-    });
-
-    console.log("Acción registrada correctamente.");
-
   } catch (error) {
     console.error("Error al exportar Excel:", error);
-    alert("No se pudo exportar o registrar la acción.");
+    alert("No se pudo exportar el Excel.");
   }
 };
+
 
 const importarExcel = async (file) => {
   if (cargandoImport) return;

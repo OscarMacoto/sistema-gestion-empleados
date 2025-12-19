@@ -227,8 +227,6 @@ router.get("/exportar", async (req, res) => {
       ORDER BY e.id_empleado;
     `);
 
-    res.json({ empleados: result.recordset });
-
     // Registrar acción
     await pool
       .request()
@@ -251,62 +249,72 @@ router.get("/exportar", async (req, res) => {
 });
 
 
-router.post("/exportar", async (req, res) => {
+router.get("/exportar", async (req, res) => {
   try {
-    const body = req.body;
+    const usuario_email = req.query.usuario_email ?? "";
     const pool = await connectDB();
-    let empleadosList = [];
-    let usuario_email = body?.usuario_email || req.query.usuario_email || req.headers["x-usuario-email"] || "";
-    let usuarioActual = null;
 
-    if (usuario_email) {
-      const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
-      if (!auth.ok) return res.status(403).json({ error: auth.error });
-      usuarioActual = auth.usuario;
-    }
+    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    if (!auth.ok) return res.status(403).json({ error: auth.error });
 
-    // Obtener lista de empleados
-    if (Array.isArray(body) && body.length > 0) {
-      empleadosList = body;
-    } else if (Array.isArray(body?.empleados) && body.empleados.length > 0) {
-      empleadosList = body.empleados;
-    } else {
-      if (!usuario_email) return res.status(400).json({ error: "Falta usuario_email para exportar desde DB" });
+    const usuarioActual = auth.usuario;
 
-      const result = await pool.request().query(`
-        SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
-               e.telefono, e.direccion,
-               c.nombre_clinica AS clinica,
-               est.descripcion AS estado,
-               r.descripcion AS rol
-        FROM Empleado e
-        LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
-        LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
-        LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
-        ORDER BY e.id_empleado
+    // 🔎 FILTROS (opcionales)
+    const filterEstado = req.query.estado ? Number(req.query.estado) : null;
+    const filterClinica = req.query.clinica ? Number(req.query.clinica) : null;
+    const filterNombre = req.query.nombre?.trim() || null;
+
+    const whereClauses = [];
+    if (filterEstado) whereClauses.push("e.id_estado = @estado");
+    if (filterClinica) whereClauses.push("e.id_clinica = @clinica");
+    if (filterNombre)
+      whereClauses.push("LOWER(e.nombre) LIKE '%' + LOWER(@nombre) + '%'");
+
+    const whereSql = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
+
+    const query = `
+      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
+             e.telefono, e.direccion,
+             c.nombre_clinica AS clinica,
+             est.descripcion AS estado,
+             r.descripcion AS rol
+      FROM Empleado e
+      LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
+      LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
+      LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
+      ${whereSql}
+      ORDER BY e.id_empleado
+    `;
+
+    const request = pool.request();
+    if (filterEstado) request.input("estado", sql.Int, filterEstado);
+    if (filterClinica) request.input("clinica", sql.Int, filterClinica);
+    if (filterNombre) request.input("nombre", sql.VarChar, filterNombre);
+
+    const result = await request.query(query);
+
+    //REGISTRAR ACCIÓN
+    await pool
+      .request()
+      .input("id_empleado", sql.Int, usuarioActual.id_empleado)
+      .input("accion", sql.VarChar, "exportado")
+      .input("usuario", sql.VarChar, usuarioActual.nombre)
+      .input(
+        "detalles",
+        sql.NVarChar,
+        `El usuario ${usuarioActual.nombre} exportó la lista de empleados`
+      )
+      .query(`
+        INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
+        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
       `);
-      empleadosList = result.recordset;
-    }
 
-    if (usuarioActual) {
-      await pool
-        .request()
-        .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-        .input("accion", sql.VarChar, "exportado")
-        .input("usuario", sql.VarChar, usuarioActual.nombre)
-        .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} exportó la lista de empleados`)
-        .query(`
-          INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
-        `);
-    }
-
-    // Generar Excel
-
-    await generarExcelEmpleados(empleadosList, res);
+    await generarExcelEmpleados(result.recordset, res);
 
   } catch (err) {
-    console.error("POST /exportar error:", err);
+    console.error("GET /exportar error:", err);
     res.status(500).json({ error: "Error al exportar Excel" });
   }
 });
@@ -384,8 +392,6 @@ router.get("/", async (req, res) => {
       LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
       ${whereSql}
       ORDER BY e.id_empleado
-      OFFSET @offset ROWS
-      FETCH NEXT @limit ROWS ONLY
     `;
 
   const request = pool.request()
