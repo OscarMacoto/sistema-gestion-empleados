@@ -84,6 +84,7 @@ const Empleado = () => {
   const [usuarioActivo, setUsuarioActivo] = useState({ nombre: "", correo: "" });
   const inputFileRef = useRef(null);
   const [cargandoImport, setCargandoImport] = useState(false);
+  const [cargandoExport, setCargandoExport] = useState(false);
 
 
 
@@ -320,21 +321,20 @@ const eliminarEmpleado = async (id) => {
 
 
   // EXPORTAR / IMPORTAR 
+const exportarExcel = async () => {
+  if (cargandoExport) return;
 
-  const exportarExcel = async () => {
+  setCargandoExport(true);
   try {
-    const res = await axios.get(
-      "http://localhost:5000/api/empleados/exportar",
-      {
-        params: {
-          usuario_email: usuarioActivo.correo,
-          nombre: filtroNombre,
-          estado: filtroEstado,
-          clinica: filtroClinica,
-        },
-        responseType: "blob",
-      }
-    );
+    const res = await axios.get("http://localhost:5000/api/empleados/exportar", {
+      params: {
+        usuario_email: usuarioActivo.correo,
+        nombre: filtroNombre,
+        estado: filtroEstado,
+        clinica: filtroClinica,
+      },
+      responseType: "blob",
+    });
 
     const url = window.URL.createObjectURL(new Blob([res.data]));
     const link = document.createElement("a");
@@ -343,13 +343,15 @@ const eliminarEmpleado = async (id) => {
     document.body.appendChild(link);
     link.click();
     link.remove();
-
   } catch (error) {
     console.error("Error al exportar Excel:", error);
     alert("No se pudo exportar el Excel.");
+  } finally {
+    setCargandoExport(false);
   }
 };
 
+//Importar Excel
 
 const importarExcel = async (file) => {
   if (cargandoImport) return;
@@ -476,18 +478,24 @@ const importarExcel = async (file) => {
 
         <div className="flex gap-2 flex-wrap">
           {/* EXPORTAR */}
-          <button
-            onClick={exportarExcel}
-            disabled={exportarDeshabilitado}
-            className={`px-4 py-2 rounded text-white 
-              ${
-                exportarDeshabilitado
+            <button
+              onClick={exportarExcel}
+              disabled={exportarDeshabilitado || cargandoExport}
+              className={`px-4 py-2 rounded text-white ${
+                exportarDeshabilitado || cargandoExport
                   ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-green-500 hover:bg-green-600"
+                  : "bg-indigo-500 hover:bg-indigo-600"
               }`}
-          >
-            Exportar Excel
-          </button>
+              title={
+                exportarDeshabilitado
+                  ? "Tu rol actual (RRHH) no permite exportar."
+                  : cargandoExport
+                  ? "Exportando…"
+                  : undefined
+              }
+            >
+              {cargandoExport ? "Exportando…" : "Exportar Excel"}
+            </button>
 
           {/* IMPORTAR */}
           <button

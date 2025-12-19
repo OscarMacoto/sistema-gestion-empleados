@@ -152,7 +152,7 @@ router.post("/registrarAccion", async (req, res) => {
       .input("detalles", sql.NVarChar, detalles || "")
       .query(`
         INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+        VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
       `);
 
     res.json({ success: true });
@@ -231,12 +231,12 @@ router.get("/exportar", async (req, res) => {
     await pool
       .request()
       .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-      .input("accion", sql.VarChar, "exportado")
+      .input("accion", sql.VarChar, "Exportado Usuarios")
       .input("usuario", sql.VarChar, usuarioActual.nombre)
       .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} exportó la lista de empleados`)
       .query(`
         INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+        VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
       `);
 
     // Generar Excel
@@ -308,7 +308,7 @@ router.get("/exportar", async (req, res) => {
       )
       .query(`
         INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+        VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
       `);
 
     await generarExcelEmpleados(result.recordset, res);
@@ -467,7 +467,7 @@ router.post("/", async (req, res) => {
       .input("fecha_ingreso", sql.Date, fecha_ingreso ? new Date(fecha_ingreso) : null)
       .query(`
         INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, id_rol, fecha_ingreso, foto)
-        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETDATE()), @foto);
+        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETUTCDATE()), @foto);
         SELECT SCOPE_IDENTITY() AS id_empleado;
       `);
 
@@ -482,7 +482,7 @@ router.post("/", async (req, res) => {
         .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} ha agregado al empleado ${nombre}`)
         .query(`
           INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+          VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
         `);
     }
 
@@ -572,7 +572,7 @@ router.put("/:id", async (req, res) => {
         .input("detalles", sql.NVarChar, detalles)
         .query(`
           INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+          VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
         `);
     }
 
@@ -616,7 +616,7 @@ router.delete("/:id", async (req, res) => {
       .input("detalles", sql.NVarChar, detalles)
       .query(`
         INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+        VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
       `);
 
     res.json({ success: true, message: "Empleado eliminado correctamente" });
@@ -692,7 +692,7 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
         .input("foto", sql.VarBinary(sql.MAX), fotoBuffer)
         .query(`
           INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, id_rol, fecha_ingreso, fecha_salida, foto)
-          VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETDATE()), @fecha_salida, @foto);
+          VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETUTCDATE()), @fecha_salida, @foto);
           SELECT SCOPE_IDENTITY() AS id_empleado;
         `);
 
@@ -708,7 +708,7 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
         .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} ha importado al empleado ${nombre}`)
         .query(`
           INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+          VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
         `);
     }
 
