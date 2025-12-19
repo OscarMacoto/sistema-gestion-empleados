@@ -3,6 +3,7 @@ import axios from "axios";
 import { useMsal } from "@azure/msal-react";
 
 
+
 const SelectInput = ({ name, value, onChange, options, placeholder, disabled }) => {
   const getId = (opt) => opt.id_estado || opt.id_clinica || opt.id_rol;
   const getLabel = (opt) => opt.descripcion || opt.nombre_clinica || opt.nombre_rol;
@@ -60,6 +61,7 @@ const Empleado = () => {
   const [empleados, setEmpleados] = useState([]);
   const [paginaActual, setPaginaActual] = useState(1);
   const empleadosPorPagina = 10;
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroClinica, setFiltroClinica] = useState("");
@@ -94,18 +96,31 @@ const Empleado = () => {
   }, [accounts]);
 
   // GET LISTAS
+  
+useEffect(() => {
+  setPaginaActual(1);
+}, [filtroNombre, filtroEstado, filtroClinica]);
 
-  const obtenerEmpleados = useCallback(async () => {
-    if (!usuarioActivo.correo) return;
-    try {
-      const res = await axios.get("http://localhost:5000/api/empleados", {
-        params: { usuario_email: usuarioActivo.correo },
-      });
-      setEmpleados(res.data.empleados || []);
-    } catch (error) {
-      console.error("Error al obtener empleados:", error);
-    }
-  }, [usuarioActivo]);
+
+ const obtenerEmpleados = useCallback(async () => {
+  if (!usuarioActivo.correo) return;
+
+  const res = await axios.get("http://localhost:5000/api/empleados", {
+  params: {
+    usuario_email: usuarioActivo.correo,
+    page: paginaActual,
+    limit: empleadosPorPagina,
+    nombre: filtroNombre,
+    estado: filtroEstado,
+    clinica: filtroClinica,
+  },
+});
+
+setEmpleados(res.data.empleados || []);
+setTotalPaginas(res.data.totalPages || 1);
+  setEmpleados(res.data.empleados);
+}, [usuarioActivo, paginaActual, filtroNombre, filtroEstado, filtroClinica]);
+
 
   const obtenerEstados = async () => {
     try {
@@ -141,24 +156,7 @@ const Empleado = () => {
     obtenerRoles();
   }, [obtenerEmpleados]);
 
-  const normalizar = (texto) =>
-    texto?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() || "";
-
-  const empleadosFiltrados = empleados.filter(
-  (e) =>
-    normalizar(e.nombre).includes(normalizar(filtroNombre)) &&
-    (filtroEstado === "" || e.id_estado === Number(filtroEstado)) &&
-    (filtroClinica === "" || e.id_clinica === Number(filtroClinica))
-);
-
-
-    const totalPaginas = Math.ceil(empleadosFiltrados.length / empleadosPorPagina);
-    const indiceUltimo = paginaActual * empleadosPorPagina;
-    const indicePrimero = indiceUltimo - empleadosPorPagina;
-    const empleadosActuales = empleadosFiltrados.slice(indicePrimero, indiceUltimo);
-
-
-
+  const empleadosActuales = empleados;
   const formatFecha = (fecha) => {
     if (!fecha) return "";
     const d = new Date(fecha);

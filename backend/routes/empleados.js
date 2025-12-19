@@ -357,11 +357,15 @@ router.get("/", async (req, res) => {
 
     const filterEstado = req.query.estado ? Number(req.query.estado) : null;
     const filterClinica = req.query.clinica ? Number(req.query.clinica) : null;
+    const filterNombre = req.query.nombre?.trim() || null;
 
 
     const whereClauses = [];
-    if (filterEstado) whereClauses.push(`e.id_estado = ${filterEstado}`);
-    if (filterClinica) whereClauses.push(`e.id_clinica = ${filterClinica}`);
+    if (filterEstado) whereClauses.push(`e.id_estado = @estado`);
+    if (filterClinica) whereClauses.push(`e.id_clinica = @clinica`);
+    if (filterNombre)
+      whereClauses.push(`LOWER(e.nombre) LIKE '%' + LOWER(@nombre) + '%'`);
+
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     const query = `
@@ -383,10 +387,34 @@ router.get("/", async (req, res) => {
       OFFSET @offset ROWS
       FETCH NEXT @limit ROWS ONLY
     `;
-    const result = await pool.request().input("offset", sql.Int, offset).input("limit", sql.Int, limit).query(query);
+
+  const request = pool.request()
+  .input("offset", sql.Int, offset)
+  .input("limit", sql.Int, limit);
+
+  if (filterEstado) request.input("estado", sql.Int, filterEstado);
+  if (filterClinica) request.input("clinica", sql.Int, filterClinica);
+  if (filterNombre) request.input("nombre", sql.VarChar, filterNombre);
+
+    const result = await request.query(query);
+
     const empleados = result.recordset.map(emp => ({ ...emp, foto: emp.foto ? Buffer.from(emp.foto).toString("base64") : null }));
 
-    const totalResult = await pool.request().query("SELECT COUNT(*) AS total FROM Empleado");
+    const totalQuery = `
+      SELECT COUNT(*) AS total
+      FROM Empleado e
+      ${whereSql}
+    `;
+
+    const totalReq = pool.request();
+    if (filterEstado) totalReq.input("estado", sql.Int, filterEstado);
+    if (filterClinica) totalReq.input("clinica", sql.Int, filterClinica);
+    if (filterNombre) totalReq.input("nombre", sql.VarChar, filterNombre);
+
+    const totalResult = await totalReq.query(totalQuery);
+
+
+
     const total = totalResult.recordset[0].total ?? 0;
 
     res.json({ empleados, total, currentPage: page, totalPages: Math.ceil(total / limit) });
