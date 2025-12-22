@@ -119,7 +119,6 @@ useEffect(() => {
 
 setEmpleados(res.data.empleados || []);
 setTotalPaginas(res.data.totalPages || 1);
-  setEmpleados(res.data.empleados);
 }, [usuarioActivo, paginaActual, filtroNombre, filtroEstado, filtroClinica]);
 
 

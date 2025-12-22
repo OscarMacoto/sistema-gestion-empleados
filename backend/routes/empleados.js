@@ -203,113 +203,87 @@ async function generarExcelEmpleados(empleadosList, res, filename = "Empleados.x
   res.end();
 }
 
-// GET usuario email
-
 router.get("/exportar", async (req, res) => {
   try {
-    const usuario_email = req.query.usuario_email ?? "";
-    const pool = await connectDB();
-    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
-    if (!auth.ok) return res.status(403).json({ error: auth.error });
-    const usuarioActual = auth.usuario;
+    const { usuario_email, nombre, estado, clinica } = req.query;
 
-    // GET empleados
-    const result = await pool.request().query(`
-      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
-            e.telefono, e.direccion,
-            c.nombre_clinica AS clinica,
-            est.descripcion AS estado,
-            r.descripcion AS rol
-      FROM Empleado e
-      LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
-      LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
-      LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
-      ORDER BY e.id_empleado;
-    `);
-
-    // Registrar acción
-    await pool
-      .request()
-      .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-      .input("accion", sql.VarChar, "Exportado Usuarios")
-      .input("usuario", sql.VarChar, usuarioActual.nombre)
-      .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} exportó la lista de empleados`)
-      .query(`
-        INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
-      `);
-
-    // Generar Excel
-    await generarExcelEmpleados(result.recordset, res);
-
-  } catch (err) {
-    console.error("GET /exportar error:", err);
-    res.status(500).json({ error: "Error al exportar Excel" });
-  }
-});
-
-
-router.get("/exportar", async (req, res) => {
-  try {
-    const usuario_email = req.query.usuario_email ?? "";
     const pool = await connectDB();
 
-    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    const auth = await verificarRoles(pool, usuario_email, [
+      PERMS.ADMIN,
+      PERMS.RRHH,
+    ]);
     if (!auth.ok) return res.status(403).json({ error: auth.error });
 
     const usuarioActual = auth.usuario;
 
-    // 🔎 FILTROS (opcionales)
-    const filterEstado = req.query.estado ? Number(req.query.estado) : null;
-    const filterClinica = req.query.clinica ? Number(req.query.clinica) : null;
-    const filterNombre = req.query.nombre?.trim() || null;
-
+    // FILTROS
     const whereClauses = [];
-    if (filterEstado) whereClauses.push("e.id_estado = @estado");
-    if (filterClinica) whereClauses.push("e.id_clinica = @clinica");
-    if (filterNombre)
-      whereClauses.push("LOWER(e.nombre) LIKE '%' + LOWER(@nombre) + '%'");
+    const request = pool.request();
 
-    const whereSql = whereClauses.length
+    if (estado) {
+      whereClauses.push("e.id_estado = @estado");
+      request.input("estado", sql.Int, Number(estado));
+    }
+
+    if (clinica) {
+      whereClauses.push("e.id_clinica = @clinica");
+      request.input("clinica", sql.Int, Number(clinica));
+    }
+
+    if (nombre?.trim()) {
+      whereClauses.push("LOWER(e.nombre) LIKE '%' + LOWER(@nombre) + '%'");
+      request.input("nombre", sql.VarChar, nombre.trim());
+    }
+
+    const whereSQL = whereClauses.length
       ? `WHERE ${whereClauses.join(" AND ")}`
       : "";
 
     const query = `
-      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
-             e.telefono, e.direccion,
-             c.nombre_clinica AS clinica,
-             est.descripcion AS estado,
-             r.descripcion AS rol
+      SELECT 
+        e.id_empleado,
+        e.nombre,
+        e.DNI,
+        e.correo,
+        e.fecha_ingreso,
+        e.fecha_salida,
+        e.telefono,
+        e.direccion,
+        c.nombre_clinica AS clinica,
+        est.descripcion AS estado,
+        r.descripcion AS rol
       FROM Empleado e
       LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
       LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
       LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
-      ${whereSql}
+      ${whereSQL}
       ORDER BY e.id_empleado
     `;
 
-    const request = pool.request();
-    if (filterEstado) request.input("estado", sql.Int, filterEstado);
-    if (filterClinica) request.input("clinica", sql.Int, filterClinica);
-    if (filterNombre) request.input("nombre", sql.VarChar, filterNombre);
-
     const result = await request.query(query);
 
-    //REGISTRAR ACCIÓN
+    // REGISTRAR ACCIÓN
     await pool
       .request()
       .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-      .input("accion", sql.VarChar, "exportado")
+      .input("accion", sql.VarChar, "Exportar Empleados")
       .input("usuario", sql.VarChar, usuarioActual.nombre)
       .input(
         "detalles",
         sql.NVarChar,
-        `El usuario ${usuarioActual.nombre} exportó la lista de empleados`
+        `El usuario ${usuarioActual.nombre} exportó ${
+          whereClauses.length ? "empleados filtrados" : "todos los empleados"
+        }`
       )
       .query(`
-        INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
+        INSERT INTO RRHH_RegistroAcciones
+          (id_empleado, accion, fecha, usuario, detalles)
+        VALUES
+          (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
       `);
+
+    // GENERAR EXCEL
 
     await generarExcelEmpleados(result.recordset, res);
 
@@ -352,83 +326,76 @@ router.get("/mi-perfil/:correo", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
+    const {
+      page = 1,
+      limit = 10,
+      nombre,
+      estado,
+      clinica,
+      usuario_email
+    } = req.query;
+
     const pool = await connectDB();
-    pool.config.requestTimeout = 30000;
-
-    const usuario_email = req.query.usuario_email || req.headers["x-usuario-email"] || "";
-    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
-    if (!auth.ok) return res.status(403).json({ error: auth.error });
-
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit) || 10000));
     const offset = (page - 1) * limit;
 
-    const filterEstado = req.query.estado ? Number(req.query.estado) : null;
-    const filterClinica = req.query.clinica ? Number(req.query.clinica) : null;
-    const filterNombre = req.query.nombre?.trim() || null;
-
-
     const whereClauses = [];
-    if (filterEstado) whereClauses.push(`e.id_estado = @estado`);
-    if (filterClinica) whereClauses.push(`e.id_clinica = @clinica`);
-    if (filterNombre)
-      whereClauses.push(`LOWER(e.nombre) LIKE '%' + LOWER(@nombre) + '%'`);
+    if (estado) whereClauses.push("e.id_estado = @estado");
+    if (clinica) whereClauses.push("e.id_clinica = @clinica");
+    if (nombre)
+      whereClauses.push("LOWER(e.nombre) LIKE '%' + LOWER(@nombre) + '%'");
 
-    const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+    const whereSql = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
 
-    const query = `
-      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.fecha_ingreso, e.fecha_salida,
-             e.telefono, e.direccion,
-             c.nombre_clinica AS clinica,
-             est.descripcion AS estado,
-             r.descripcion AS rol,
-             e.foto,
-             e.id_estado,
-             e.id_clinica,
-             e.id_rol
-      FROM Empleado e
-      LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
-      LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
-      LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
-      ${whereSql}
-      ORDER BY e.id_empleado
-    `;
+    const totalReq = pool.request();
+    if (estado) totalReq.input("estado", sql.Int, estado);
+    if (clinica) totalReq.input("clinica", sql.Int, clinica);
+    if (nombre) totalReq.input("nombre", sql.VarChar, nombre);
 
-  const request = pool.request()
-  .input("offset", sql.Int, offset)
-  .input("limit", sql.Int, limit);
-
-  if (filterEstado) request.input("estado", sql.Int, filterEstado);
-  if (filterClinica) request.input("clinica", sql.Int, filterClinica);
-  if (filterNombre) request.input("nombre", sql.VarChar, filterNombre);
-
-    const result = await request.query(query);
-
-    const empleados = result.recordset.map(emp => ({ ...emp, foto: emp.foto ? Buffer.from(emp.foto).toString("base64") : null }));
-
-    const totalQuery = `
+    const totalResult = await totalReq.query(`
       SELECT COUNT(*) AS total
       FROM Empleado e
       ${whereSql}
-    `;
+    `);
 
-    const totalReq = pool.request();
-    if (filterEstado) totalReq.input("estado", sql.Int, filterEstado);
-    if (filterClinica) totalReq.input("clinica", sql.Int, filterClinica);
-    if (filterNombre) totalReq.input("nombre", sql.VarChar, filterNombre);
+    const total = totalResult.recordset[0].total;
+    const totalPages = Math.ceil(total / limit);
+    const dataReq = pool.request();
+    if (estado) dataReq.input("estado", sql.Int, estado);
+    if (clinica) dataReq.input("clinica", sql.Int, clinica);
+    if (nombre) dataReq.input("nombre", sql.VarChar, nombre);
 
-    const totalResult = await totalReq.query(totalQuery);
+    dataReq.input("limit", sql.Int, Number(limit));
+    dataReq.input("offset", sql.Int, offset);
 
+    const data = await dataReq.query(`
+      SELECT e.id_empleado, e.nombre, e.DNI, e.correo, e.telefono,
+             e.direccion, e.fecha_ingreso, e.fecha_salida,
+             est.descripcion AS estado,
+             c.nombre_clinica AS clinica,
+             r.descripcion AS rol
+      FROM Empleado e
+      LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
+      LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
+      LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
+      ${whereSql}
+      ORDER BY e.id_empleado
+      OFFSET @offset ROWS
+      FETCH NEXT @limit ROWS ONLY
+    `);
 
+    res.json({
+      empleados: data.recordset,
+      totalPages,
+    });
 
-    const total = totalResult.recordset[0].total ?? 0;
-
-    res.json({ empleados, total, currentPage: page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
-    console.error("GET / error:", err);
+    console.error("GET /empleados error:", err);
     res.status(500).json({ error: "Error al obtener empleados" });
   }
 });
+
 
 // CREAR empleado (POST /)
 
