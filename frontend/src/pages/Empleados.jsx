@@ -2,8 +2,6 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import axios from "axios";
 import { useMsal } from "@azure/msal-react";
 
-
-
 const SelectInput = ({ name, value, onChange, options, placeholder, disabled }) => {
   const getId = (opt) => opt.id_estado || opt.id_clinica || opt.id_rol;
   const getLabel = (opt) => opt.descripcion || opt.nombre_clinica || opt.nombre_rol;
@@ -36,7 +34,7 @@ const FotoInput = ({ foto, setFoto }) => {
     const reader = new FileReader();
     reader.onloadend = () => setFoto(reader.result.split(",")[1]);
     reader.readAsDataURL(file);
-  };
+    };
   return (
     <div>
       <input
@@ -89,7 +87,6 @@ const Empleado = () => {
 
 
   // GET USUARIO ACTIVO
-
   useEffect(() => {
     if (accounts.length > 0) {
       setUsuarioActivo({ nombre: accounts[0].name, correo: accounts[0].username });
@@ -97,7 +94,6 @@ const Empleado = () => {
   }, [accounts]);
 
   // GET LISTAS
-  
 useEffect(() => {
   setPaginaActual(1);
 }, [filtroNombre, filtroEstado, filtroClinica]);
@@ -107,21 +103,19 @@ useEffect(() => {
   if (!usuarioActivo.correo) return;
 
   const res = await axios.get("http://localhost:5000/api/empleados", {
-  params: {
-    usuario_email: usuarioActivo.correo,
-    page: paginaActual,
-    limit: empleadosPorPagina,
-    nombre: filtroNombre,
-    estado: filtroEstado,
-    clinica: filtroClinica,
-  },
+    params: {
+      usuario_email: usuarioActivo.correo,
+      page: paginaActual,
+      limit: empleadosPorPagina,
+      nombre: filtroNombre,
+      estado: filtroEstado,
+      clinica: filtroClinica,
+    },
 });
 
 setEmpleados(res.data.empleados || []);
 setTotalPaginas(res.data.totalPages || 1);
 }, [usuarioActivo, paginaActual, filtroNombre, filtroEstado, filtroClinica]);
-
-
   const obtenerEstados = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/empleados/estados/lista");
@@ -164,19 +158,14 @@ setTotalPaginas(res.data.totalPages || 1);
   };
 
 // ADD (POST) EMPLEADO
-const handleChangeNuevo = (e) => {
-  let value = e.target.value;
+  const handleChangeNuevo = (e) => {
+    let value = e.target.value;
+    if (e.target.name === "DNI" || e.target.name === "telefono") {
+      value = value.replace(/\D/g, "");
+    }
+    setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: value });
+  };
 
-  if (e.target.name === "DNI") {
-    value = value.replace(/[^0-9 -]/g, "");
-  }
-
-  if (e.target.name === "telefono") {
-    value = value.replace(/[^0-9-]/g, "");
-  }
-
-  setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: value });
-};
 
 const agregarEmpleado = async () => {
   if (
@@ -188,13 +177,7 @@ const agregarEmpleado = async () => {
   )
     return alert("Por favor completa todos los campos obligatorios.");
 
-  const dniRegex = /^(\d{4}[- ]\d{4}[- ]\d{5})$/;
-  if (!dniRegex.test(nuevoEmpleado.DNI)) {
-    return alert("DNI inválido. Debe tener formato xxxx xxxx xxxxx o xxxx-xxxx-xxxxx");
-  }
-
   const telefonoNormalizado = nuevoEmpleado.telefono.replace(/-/g, "");
-
   const estadoSeleccionado = estados.find(
     (e) => e.id_estado === nuevoEmpleado.id_estado
   );
@@ -235,7 +218,76 @@ const agregarEmpleado = async () => {
     alert(error.response?.data?.error || "Error al agregar empleado.");
   }
 };
+//  VALIDADORES 
 
+  const validarEmpleadoEditado = () => {
+    if (
+      !empleadoEditando.id_estado ||
+      !empleadoEditando.id_clinica ||
+      !empleadoEditando.id_rol ||
+      !empleadoEditando.telefono?.trim() ||
+      !empleadoEditando.direccion?.trim()
+    ) {
+      alert("Todos los campos son obligatorios.");
+      return false;
+    }
+
+    if (empleadoEditando.telefono.length < 8) {
+      alert("El teléfono debe tener al menos 8 dígitos.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const validarNuevoEmpleado = () => {
+  const {
+    nombre,
+    DNI,
+    correo,
+    telefono,
+    direccion,
+    id_estado,
+    id_clinica,
+    id_rol,
+  } = nuevoEmpleado;
+
+  if (
+    !nombre.trim() ||
+    !DNI.trim() ||
+    !correo.trim() ||
+    !telefono.trim() ||
+    !direccion.trim() ||
+    !id_estado ||
+    !id_clinica ||
+    !id_rol
+  ) {
+    alert("Todos los campos son obligatorios.");
+    return false;
+  }
+
+  if (!/^\d+$/.test(DNI)) {
+    alert("El DNI solo debe contener números.");
+    return false;
+  }
+
+  if (DNI.length < 13) {
+    alert("El DNI no es válido.");
+    return false;
+  }
+
+  if (!/^\d+$/.test(telefono)) {
+    alert("El teléfono solo debe contener números.");
+    return false;
+  }
+
+  if (telefono.length < 8) {
+    alert("El teléfono debe tener al menos 8 dígitos.");
+    return false;
+  }
+
+  return true;
+};
 
 
   const seleccionarEmpleado = (empleado) => {
@@ -318,11 +370,9 @@ const eliminarEmpleado = async (id) => {
   }
 };
 
-
   // EXPORTAR / IMPORTAR 
 const exportarExcel = async () => {
   if (cargandoExport) return;
-
   setCargandoExport(true);
   try {
     const res = await axios.get("http://localhost:5000/api/empleados/exportar", {
@@ -355,7 +405,6 @@ const exportarExcel = async () => {
 const importarExcel = async (file) => {
   if (cargandoImport) return;
   if (!file) return alert("Selecciona un archivo primero.");
-
   setCargandoImport(true);
 
   try {
@@ -371,7 +420,6 @@ const importarExcel = async (file) => {
 
     alert("Empleados importados correctamente.");
     obtenerEmpleados();
-    // setArchivoSeleccionado(null);
   } catch (error) {
     console.error("Error al importar Excel:", error);
     alert("No se pudo importar el archivo. Verifica el formato del Excel.");
@@ -382,7 +430,6 @@ const importarExcel = async (file) => {
 
   const Paginacion = ({ totalPaginas, paginaActual, setPaginaActual }) => {
   const maxBotones = 7;
-
   const getRangoPaginas = () => {
     let start = Math.max(1, paginaActual - Math.floor(maxBotones / 2));
     let end = start + maxBotones - 1;
@@ -398,7 +445,6 @@ const importarExcel = async (file) => {
   };
 
   const paginas = getRangoPaginas();
-
   return (
     <div className="flex justify-center mt-4 gap-2 flex-wrap">
       <button
@@ -417,7 +463,6 @@ const importarExcel = async (file) => {
       </button>
 
       {paginas[0] > 1 && <span className="px-2">...</span>}
-
       {paginas.map((num) => (
         <button
           key={num}
@@ -431,7 +476,6 @@ const importarExcel = async (file) => {
       ))}
 
       {paginas[paginas.length - 1] < totalPaginas && <span className="px-2">...</span>}
-
       <button
         onClick={() => setPaginaActual(paginaActual + 1)}
         disabled={paginaActual === totalPaginas}
@@ -461,7 +505,6 @@ const importarExcel = async (file) => {
   const rolActual = localStorage.getItem("usuario_rol");
   const exportarDeshabilitado = rolActual === "RRHH";
   const rolDeshabilitado = rolActual !== "Administrador";
-
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold text-center mb-6">Gestión de Empleados</h2>
@@ -469,8 +512,13 @@ const importarExcel = async (file) => {
       {/* BOTONES DE ACCIONES */}
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <button
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        onClick={() => setMostrarFormulario(!mostrarFormulario)}
+        className={`text-white px-4 py-2 rounded transition-colors
+          ${
+            mostrarFormulario
+              ? "bg-red-600 hover:bg-red-700"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
         >
           {mostrarFormulario ? "Cancelar" : "Agregar empleado"}
         </button>
@@ -513,7 +561,6 @@ const importarExcel = async (file) => {
           >
             {cargandoImport ? "Importando..." : "Importar Excel"}
           </button>
-
           <input
             type="file"
             ref={inputFileRef}
@@ -530,60 +577,63 @@ const importarExcel = async (file) => {
         </div>
       </div>
 
-
-      {/* FORMULARIO NUEVO EMPLEADO */}
-      {mostrarFormulario && (
-        <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
-          <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {["nombre", "DNI", "correo", "telefono", "direccion"].map((f) => (
-              <input
-                key={f}
-                name={f}
-                placeholder={f}
-                value={nuevoEmpleado[f]}
-                onChange={handleChangeNuevo}
-                className="p-2 border rounded text-sm"
-              />
-            ))}
-            <SelectInput
-              name="id_estado"
-              value={nuevoEmpleado.id_estado}
+  {/* FORMULARIO NUEVO EMPLEADO */}
+    {mostrarFormulario && (
+      <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
+        <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {["Nombre", "DNI", "Correo", "Telefono", "Direccion"].map((f) => (
+            <input
+              key={f}
+              name={f}
+              placeholder={f}
+              value={nuevoEmpleado[f]}
               onChange={handleChangeNuevo}
-              options={estados}
-              placeholder="Seleccionar estado..."
+              className="p-2 border rounded text-sm"
             />
-            <SelectInput
-              name="id_clinica"
-              value={nuevoEmpleado.id_clinica}
-              onChange={handleChangeNuevo}
-              options={clinicas}
-              placeholder="Seleccionar clínica..."
-            />
-            <SelectInput
-              name="id_rol"
-              value={nuevoEmpleado.id_rol}
-              onChange={handleChangeNuevo}
-              options={roles}
-              placeholder="Selecciona un rol"
-              disabled={rolDeshabilitado}
-            />
-
-            <FotoInput
-              foto={nuevoEmpleado.foto}
-              setFoto={(foto) => setNuevoEmpleado({ ...nuevoEmpleado, foto })}
-            />
-          </div>
-          <div className="flex justify-center mt-4">
-            <button
-              onClick={agregarEmpleado}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              Guardar empleado
-            </button>
-          </div>
+          ))}
+          <SelectInput
+            name="id_estado"
+            value={nuevoEmpleado.id_estado}
+            onChange={handleChangeNuevo}
+            options={estados}
+            placeholder="Seleccionar estado..."
+          />
+          <SelectInput
+            name="id_clinica"
+            value={nuevoEmpleado.id_clinica}
+            onChange={handleChangeNuevo}
+            options={clinicas}
+            placeholder="Seleccionar clínica..."
+          />
+          <SelectInput
+            name="id_rol"
+            value={nuevoEmpleado.id_rol}
+            onChange={handleChangeNuevo}
+            options={roles}
+            placeholder="Selecciona un rol"
+            disabled={rolDeshabilitado}
+          />
+          <FotoInput
+            foto={nuevoEmpleado.foto}
+            setFoto={(foto) =>
+              setNuevoEmpleado({ ...nuevoEmpleado, foto })
+            }
+          />
         </div>
-      )}
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={() => {
+              if (!validarNuevoEmpleado()) return;
+              agregarEmpleado();
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Guardar empleado
+          </button>
+        </div>
+      </div>
+    )}
 
       {/* FORMULARIO EDITAR EMPLEADO */}
       {empleadoEditando && (
@@ -627,10 +677,10 @@ const importarExcel = async (file) => {
               placeholder="Teléfono"
               value={empleadoEditando.telefono || ""}
               onChange={(e) => {
-                const valor = e.target.value.replace(/[^0-9-]/g, "");
+                const soloNumeros = e.target.value.replace(/\D/g, "");
                 setEmpleadoEditando({
                   ...empleadoEditando,
-                  telefono: valor,
+                  telefono: soloNumeros,
                 });
               }}
               className="p-2 border rounded text-sm"
@@ -648,7 +698,10 @@ const importarExcel = async (file) => {
             />
             <div className="flex justify-start gap-2 mt-2">
               <button
-                onClick={actualizarEmpleado}
+                onClick={() => {
+                  if (!validarEmpleadoEditado()) return;
+                  actualizarEmpleado();
+                }}
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
               >
                 Guardar cambios
