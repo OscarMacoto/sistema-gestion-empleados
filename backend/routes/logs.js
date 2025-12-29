@@ -4,21 +4,22 @@ import ExcelJS from "exceljs";
 
 const router = express.Router();
 
-
 const parseDesde = (fechaStr) => {
   if (!fechaStr) return null;
-  const fecha = new Date(fechaStr + "T00:00:00Z");
-  return fecha;
+  return new Date(`${fechaStr}T00:00:00`);
 };
+
 
 const parseHasta = (fechaStr) => {
   if (!fechaStr) return null;
-  const fecha = new Date(fechaStr + "T00:00:00Z"); 
-  fecha.setUTCDate(fecha.getUTCDate() + 1);
+  const fecha = new Date(`${fechaStr}T00:00:00`);
+  fecha.setDate(fecha.getDate() + 1);
   return fecha;
 };
 
+// ============================
 // GET /logs
+// ============================
 router.get("/", async (req, res) => {
   const { desde, hasta } = req.query;
 
@@ -27,23 +28,22 @@ router.get("/", async (req, res) => {
     let query = `
       SELECT id_registro, id_empleado, accion, fecha, usuario, detalles
       FROM RRHH_RegistroAcciones
-      WHERE 1=1
+      WHERE 1 = 1
     `;
     const request = pool.request();
 
     if (desde) {
-      const fechaDesde = parseDesde(desde);
-      request.input("desde", sql.DateTime2, fechaDesde);
+      request.input("desde", sql.DateTime2, parseDesde(desde));
       query += " AND fecha >= @desde";
     }
 
     if (hasta) {
-      const fechaHasta = parseHasta(hasta);
-      request.input("hasta", sql.DateTime2, fechaHasta);
+      request.input("hasta", sql.DateTime2, parseHasta(hasta));
       query += " AND fecha < @hasta";
     }
 
     query += " ORDER BY fecha DESC";
+
     const result = await request.query(query);
     res.json(result.recordset);
   } catch (error) {
@@ -52,7 +52,9 @@ router.get("/", async (req, res) => {
   }
 });
 
+// ============================
 // GET /logs/exportar
+// ============================
 router.get("/exportar", async (req, res) => {
   const { desde, hasta } = req.query;
 
@@ -61,23 +63,22 @@ router.get("/exportar", async (req, res) => {
     let query = `
       SELECT id_registro, id_empleado, accion, fecha, usuario, detalles
       FROM RRHH_RegistroAcciones
-      WHERE 1=1
+      WHERE 1 = 1
     `;
     const request = pool.request();
 
     if (desde) {
-      const fechaDesde = parseDesde(desde);
-      request.input("desde", sql.DateTime2, fechaDesde);
+      request.input("desde", sql.DateTime2, parseDesde(desde));
       query += " AND fecha >= @desde";
     }
 
     if (hasta) {
-      const fechaHasta = parseHasta(hasta);
-      request.input("hasta", sql.DateTime2, fechaHasta);
+      request.input("hasta", sql.DateTime2, parseHasta(hasta));
       query += " AND fecha < @hasta";
     }
 
     query += " ORDER BY fecha DESC";
+
     const result = await request.query(query);
 
     const workbook = new ExcelJS.Workbook();
@@ -110,6 +111,5 @@ router.get("/exportar", async (req, res) => {
     res.status(500).json({ error: "Error al exportar registros" });
   }
 });
-
 
 export default router;

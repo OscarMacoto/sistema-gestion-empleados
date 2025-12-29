@@ -111,7 +111,7 @@ const Logs = () => {
                   <td className="border px-3 py-2">{log.id_empleado}</td>
                   <td className="border px-3 py-2">{log.accion}</td>
                   <td className="border px-3 py-2">
-                    {new Date(log.fecha).toLocaleString()}
+                  {log.fecha.replace("T", " ").slice(0, 19)}
                   </td>
                   <td className="border px-3 py-2">{log.usuario}</td>
                   <td className="border px-3 py-2">{log.detalles}</td>

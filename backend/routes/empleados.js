@@ -152,7 +152,7 @@ router.post("/registrarAccion", async (req, res) => {
       .input("detalles", sql.NVarChar, detalles || "")
       .query(`
         INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
+        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
       `);
 
     res.json({ success: true });
@@ -280,7 +280,7 @@ router.get("/exportar", async (req, res) => {
         INSERT INTO RRHH_RegistroAcciones
           (id_empleado, accion, fecha, usuario, detalles)
         VALUES
-          (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
+          (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
       `);
 
     // GENERAR EXCEL
@@ -456,7 +456,7 @@ router.post("/", async (req, res) => {
       .input("fecha_ingreso", sql.Date, fecha_ingreso ? new Date(fecha_ingreso) : null)
       .query(`
         INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, id_rol, fecha_ingreso, foto)
-        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETUTCDATE() + 1), @foto);
+        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETDATE()), @foto);
         SELECT SCOPE_IDENTITY() AS id_empleado;
       `);
 
@@ -471,7 +471,7 @@ router.post("/", async (req, res) => {
         .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} ha agregado al empleado ${nombre}`)
         .query(`
           INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-          VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
+          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
         `);
     }
 
@@ -488,82 +488,152 @@ router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      nombre, DNI, correo, fecha_ingreso, telefono, direccion,
-      id_estado, id_clinica, id_rol, fecha_salida, foto, usuario_email,
+      nombre,
+      DNI,
+      correo,
+      fecha_ingreso,
+      telefono,
+      direccion,
+      id_estado,
+      id_clinica,
+      id_rol,
+      foto,
+      usuario_email,
     } = req.body;
 
-    if (!usuario_email) return res.status(400).json({ error: "Falta usuario_email" });
+    if (!usuario_email) {
+      return res.status(400).json({ error: "Falta usuario_email" });
+    }
 
     const pool = await connectDB();
     pool.config.requestTimeout = 30000;
 
-    const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
+    const auth = await verificarRoles(pool, usuario_email, [
+      PERMS.ADMIN,
+      PERMS.RRHH,
+    ]);
     if (!auth.ok) return res.status(403).json({ error: auth.error });
+
     const usuarioActual = auth.usuario;
 
+    // Obtener estado anterior
     const prev = await pool
       .request()
       .input("id", sql.Int, Number(id))
       .query(`
-        SELECT e.id_empleado, e.nombre, e.id_rol, r.descripcion AS rol, est.descripcion AS estado, c.nombre_clinica AS clinica
+        SELECT 
+          e.id_empleado,
+          e.nombre,
+          e.id_estado,
+          est.descripcion AS estado,
+          c.nombre_clinica AS clinica,
+          r.descripcion AS rol
         FROM Empleado e
-        LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
         LEFT JOIN Estado_empleado est ON e.id_estado = est.id_estado
         LEFT JOIN Clinica c ON e.id_clinica = c.id_clinica
+        LEFT JOIN Rol_empleado r ON e.id_rol = r.id_rol
         WHERE e.id_empleado = @id
       `);
 
-    if (!prev.recordset || prev.recordset.length === 0) {
+    if (!prev.recordset.length) {
       return res.status(404).json({ error: "Empleado no encontrado" });
     }
+
     const anterior = prev.recordset[0];
 
     const updates = [];
     const request = pool.request().input("id", sql.Int, Number(id));
 
-    if (nombre !== undefined) { updates.push("nombre = @nombre"); request.input("nombre", sql.VarChar, String(nombre)); }
-    if (DNI !== undefined) { updates.push("DNI = @DNI"); request.input("DNI", sql.VarChar, String(DNI)); }
-    if (correo !== undefined) { updates.push("correo = @correo"); request.input("correo", sql.VarChar, String(correo)); }
-    if (fecha_ingreso !== undefined) { updates.push("fecha_ingreso = @fecha_ingreso"); request.input("fecha_ingreso", sql.Date, fecha_ingreso ? new Date(fecha_ingreso) : null); }
-    if (telefono !== undefined) { updates.push("telefono = @telefono"); request.input("telefono", sql.VarChar, String(telefono)); }
-    if (direccion !== undefined) { updates.push("direccion = @direccion"); request.input("direccion", sql.VarChar, String(direccion)); }
-    if (id_estado !== undefined) { updates.push("id_estado = @id_estado"); request.input("id_estado", sql.Int, Number(id_estado)); }
-    if (id_clinica !== undefined) { updates.push("id_clinica = @id_clinica"); request.input("id_clinica", sql.Int, Number(id_clinica)); }
-    if (id_rol !== undefined) { updates.push("id_rol = @id_rol"); request.input("id_rol", sql.Int, Number(id_rol)); }
-    if (fecha_salida !== undefined) { updates.push("fecha_salida = @fecha_salida"); request.input("fecha_salida", sql.Date, fecha_salida ? new Date(fecha_salida) : null); }
-    if (foto !== undefined && foto !== null) { updates.push("foto = @foto"); request.input("foto", sql.VarBinary(sql.MAX), Buffer.from(foto, "base64")); }
+    if (nombre !== undefined) {
+      updates.push("nombre = @nombre");
+      request.input("nombre", sql.VarChar, nombre);
+    }
 
-    if (updates.length === 0) return res.status(400).json({ error: "No hay campos para actualizar" });
+    if (DNI !== undefined) {
+      updates.push("DNI = @DNI");
+      request.input("DNI", sql.VarChar, DNI);
+    }
 
-    const updateQuery = `UPDATE Empleado SET ${updates.join(", ")} WHERE id_empleado = @id`;
+    if (correo !== undefined) {
+      updates.push("correo = @correo");
+      request.input("correo", sql.VarChar, correo);
+    }
+
+    if (fecha_ingreso !== undefined) {
+      updates.push("fecha_ingreso = @fecha_ingreso");
+      request.input(
+        "fecha_ingreso",
+        sql.Date,
+        fecha_ingreso ? new Date(fecha_ingreso) : null
+      );
+    }
+
+    if (telefono !== undefined) {
+      updates.push("telefono = @telefono");
+      request.input("telefono", sql.VarChar, telefono);
+    }
+
+    if (direccion !== undefined) {
+      updates.push("direccion = @direccion");
+      request.input("direccion", sql.VarChar, direccion);
+    }
+
+    const ESTADOS_CON_SALIDA = [2, 3]; // Renuncia, Despedido
+
+      if (id_estado !== undefined) {
+        updates.push(`
+          id_estado = @id_estado,
+          fecha_salida = ${
+            ESTADOS_CON_SALIDA.includes(Number(id_estado))
+              ? "CAST(SYSDATETIMEOFFSET() AT TIME ZONE 'Central America Standard Time' AS DATE)"
+              : "NULL"
+          }
+        `);
+        request.input("id_estado", sql.Int, Number(id_estado));
+      }
+
+
+    if (id_clinica !== undefined) {
+      updates.push("id_clinica = @id_clinica");
+      request.input("id_clinica", sql.Int, Number(id_clinica));
+    }
+
+    if (id_rol !== undefined) {
+      updates.push("id_rol = @id_rol");
+      request.input("id_rol", sql.Int, Number(id_rol));
+    }
+
+    if (foto !== undefined && foto !== null) {
+      updates.push("foto = @foto");
+      request.input("foto", sql.VarBinary(sql.MAX), Buffer.from(foto, "base64"));
+    }
+
+    if (!updates.length) {
+      return res.status(400).json({ error: "No hay campos para actualizar" });
+    }
+
+    const updateQuery = `
+      UPDATE Empleado
+      SET ${updates.join(", ")}
+      WHERE id_empleado = @id
+    `;
+
     await request.query(updateQuery);
 
-    // Log de cambios
-    const estadoNuevoRes = id_estado ? await pool.request().input("id_estado", sql.Int, Number(id_estado)).query("SELECT descripcion FROM Estado_empleado WHERE id_estado = @id_estado") : null;
-    const clinicaNuevaRes = id_clinica ? await pool.request().input("id_clinica", sql.Int, Number(id_clinica)).query("SELECT nombre_clinica FROM Clinica WHERE id_clinica = @id_clinica") : null;
-    const rolNuevoRes = id_rol ? await pool.request().input("id_rol", sql.Int, Number(id_rol)).query("SELECT descripcion FROM Rol_empleado WHERE id_rol = @id_rol") : null;
+    // Registrar acción
+    const detalles = `El usuario ${usuarioActual.nombre} actualizó al empleado ${anterior.nombre}`;
 
-    const cambios = [];
-    if (id_estado !== undefined) cambios.push(`Estado: ${anterior.estado} -> ${estadoNuevoRes.recordset[0]?.descripcion || id_estado}`);
-    if (id_clinica !== undefined) cambios.push(`Clínica: ${anterior.clinica} -> ${clinicaNuevaRes.recordset[0]?.nombre_clinica || id_clinica}`);
-    if (id_rol !== undefined) cambios.push(`Rol: ${anterior.rol} -> ${rolNuevoRes.recordset[0]?.descripcion || id_rol}`);
-    if (nombre !== undefined) cambios.push(`Nombre: ${anterior.nombre} -> ${nombre}`);
-    if (DNI !== undefined) cambios.push(`DNI: ${anterior.DNI} -> ${DNI}`);
-
-    const detalles = `El usuario ${usuarioActual.nombre} ha actualizado a ${anterior.nombre}. Cambios: ${cambios.join("; ")}`;
-
-    if (usuarioActual && usuarioActual.id_empleado) {
-      await pool
-        .request()
-        .input("id_empleado", sql.Int, usuarioActual.id_empleado)
-        .input("accion", sql.VarChar, "Actualizado")
-        .input("usuario", sql.VarChar, usuarioActual.nombre)
-        .input("detalles", sql.NVarChar, detalles)
-        .query(`
-          INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-          VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
-        `);
-    }
+    await pool
+      .request()
+      .input("id_empleado", sql.Int, usuarioActual.id_empleado)
+      .input("accion", sql.VarChar, "Actualizado")
+      .input("usuario", sql.VarChar, usuarioActual.nombre)
+      .input("detalles", sql.NVarChar, detalles)
+      .query(`
+        INSERT INTO RRHH_RegistroAcciones 
+        (id_empleado, accion, fecha, usuario, detalles)
+        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
+      `);
 
     res.json({ success: true, message: "Empleado actualizado correctamente" });
   } catch (err) {
@@ -571,6 +641,7 @@ router.put("/:id", async (req, res) => {
     res.status(500).json({ error: "Error al actualizar empleado" });
   }
 });
+
 
 // ELIMINAR empleado (DELETE /:id)
 
@@ -605,7 +676,7 @@ router.delete("/:id", async (req, res) => {
       .input("detalles", sql.NVarChar, detalles)
       .query(`
         INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-        VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
+        VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
       `);
 
     res.json({ success: true, message: "Empleado eliminado correctamente" });
@@ -681,7 +752,7 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
         .input("foto", sql.VarBinary(sql.MAX), fotoBuffer)
         .query(`
           INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, id_rol, fecha_ingreso, fecha_salida, foto)
-          VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETUTCDATE()), @fecha_salida, @foto);
+          VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETDATE()), @fecha_salida, @foto);
           SELECT SCOPE_IDENTITY() AS id_empleado;
         `);
 
@@ -697,7 +768,7 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
         .input("detalles", sql.NVarChar, `El usuario ${usuarioActual.nombre} ha importado al empleado ${nombre}`)
         .query(`
           INSERT INTO RRHH_RegistroAcciones (id_empleado, accion, fecha, usuario, detalles)
-          VALUES (@id_empleado, @accion, GETUTCDATE(), @usuario, @detalles)
+          VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
         `);
     }
 

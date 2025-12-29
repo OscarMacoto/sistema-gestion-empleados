@@ -151,11 +151,26 @@ setTotalPaginas(res.data.totalPages || 1);
   }, [obtenerEmpleados]);
 
   const empleadosActuales = empleados;
+  
   const formatFecha = (fecha) => {
-    if (!fecha) return "";
-    const d = new Date(fecha);
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
-  };
+  if (!fecha) return "";
+
+  // Separar YYYY-MM-DD
+  const parts = fecha.split("-"); 
+  if (parts.length < 3) return "";
+
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // Mes en JS va de 0-11
+  const day = parseInt(parts[2], 10);
+
+  const d = new Date(year, month, day); // Esto crea la fecha en hora local
+  return d.toLocaleDateString("es-HN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
 
 // ADD (POST) EMPLEADO
   const handleChangeNuevo = (e) => {
@@ -309,21 +324,10 @@ const agregarEmpleado = async () => {
   };
 
   // ACTUALIZAR EMPLEADO
-
   const actualizarEmpleado = async () => {
-    if (!empleadoEditando.id_estado || !empleadoEditando.id_clinica)
+    if (!empleadoEditando.id_estado || !empleadoEditando.id_clinica) {
       return alert("Debes seleccionar Estado y Clínica.");
-
-     const estadosConSalida = [2, 3]; 
-
-    const generarFechaActual = () => {
-    const fecha = new Date();
-    return fecha.toISOString().slice(0, 10); 
-  };
-
-     const fechaSalida = estadosConSalida.includes(Number(empleadoEditando.id_estado))
-    ? generarFechaActual()
-    : null;
+    }
 
     try {
       await axios.put(
@@ -334,11 +338,11 @@ const agregarEmpleado = async () => {
           id_rol: Number(empleadoEditando.id_rol),
           telefono: empleadoEditando.telefono,
           direccion: empleadoEditando.direccion,
-          fecha_salida: fechaSalida,
           usuario_email: usuarioActivo.correo,
           foto: empleadoEditando.foto,
         }
       );
+
       alert("Empleado actualizado correctamente.");
       setEmpleadoEditando(null);
       obtenerEmpleados();
@@ -347,6 +351,7 @@ const agregarEmpleado = async () => {
       alert(error.response?.data?.error || "Error al actualizar empleado.");
     }
   };
+
 
   // ELIMINAR EMPLEADO
 
