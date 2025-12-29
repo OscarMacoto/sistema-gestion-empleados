@@ -232,8 +232,8 @@ const agregarEmpleado = async () => {
       return false;
     }
 
-    if (empleadoEditando.telefono.length < 8) {
-      alert("El teléfono debe tener al menos 8 dígitos.");
+    if (empleadoEditando.telefono.length < 8 || empleadoEditando.telefono.length > 8) {
+      alert("El teléfono debe tener 8 dígitos.");
       return false;
     }
 
@@ -249,7 +249,6 @@ const agregarEmpleado = async () => {
     direccion,
     id_estado,
     id_clinica,
-    id_rol,
   } = nuevoEmpleado;
 
   if (
@@ -259,8 +258,7 @@ const agregarEmpleado = async () => {
     !telefono.trim() ||
     !direccion.trim() ||
     !id_estado ||
-    !id_clinica ||
-    !id_rol
+    !id_clinica
   ) {
     alert("Todos los campos son obligatorios.");
     return false;
@@ -281,8 +279,8 @@ const agregarEmpleado = async () => {
     return false;
   }
 
-  if (telefono.length < 8) {
-    alert("El teléfono debe tener al menos 8 dígitos.");
+  if (telefono.length < 8 || telefono.length > 8) {
+    alert("El teléfono debe tener 8 dígitos.");
     return false;
   }
 
@@ -582,7 +580,7 @@ const importarExcel = async (file) => {
       <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
         <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
         <div className="grid grid-cols-2 gap-4">
-          {["Nombre", "DNI", "Correo", "Telefono", "Direccion"].map((f) => (
+          {["nombre", "DNI", "correo", "telefono", "direccion"].map((f) => (
             <input
               key={f}
               name={f}

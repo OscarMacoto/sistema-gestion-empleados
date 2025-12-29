@@ -420,6 +420,28 @@ router.post("/", async (req, res) => {
 
     const fotoBuffer = foto ? Buffer.from(foto, "base64") : null;
 
+    // VALIDAR DNI O CORREO DUPLICADOS
+    const existeEmpleado = await pool
+      .request()
+      .input("DNI", sql.VarChar, String(DNI))
+      .input("correo", sql.VarChar, String(correo))
+      .query(`
+        SELECT 
+          SUM(CASE WHEN DNI = @DNI THEN 1 ELSE 0 END) AS existeDNI,
+          SUM(CASE WHEN correo = @correo THEN 1 ELSE 0 END) AS existeCorreo
+        FROM Empleado
+      `);
+
+    const { existeDNI, existeCorreo } = existeEmpleado.recordset[0];
+
+    if (existeDNI > 0) {
+      return res.status(409).json({ error: "El DNI ya existe actualmente." });
+    }
+
+    if (existeCorreo > 0) {
+      return res.status(409).json({ error: "El correo ya existe actualmente." });
+    }
+
     const insertResult = await pool
       .request()
       .input("nombre", sql.VarChar, String(nombre))
@@ -434,7 +456,7 @@ router.post("/", async (req, res) => {
       .input("fecha_ingreso", sql.Date, fecha_ingreso ? new Date(fecha_ingreso) : null)
       .query(`
         INSERT INTO Empleado (nombre, DNI, correo, telefono, direccion, id_estado, id_clinica, id_rol, fecha_ingreso, foto)
-        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETUTCDATE()), @foto);
+        VALUES (@nombre, @DNI, @correo, @telefono, @direccion, @id_estado, @id_clinica, @id_rol, ISNULL(@fecha_ingreso, GETUTCDATE() + 1), @foto);
         SELECT SCOPE_IDENTITY() AS id_empleado;
       `);
 
