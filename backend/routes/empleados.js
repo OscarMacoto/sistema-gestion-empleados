@@ -688,6 +688,8 @@ router.delete("/:id", async (req, res) => {
 
 // IMPORTAR empleados desde Excel (POST /importar)
 
+const normalizarDNI = (dni) => (dni ? dni.replace(/[\s-]/g, "") : "");
+
 router.post("/importar", upload.single("archivo"), async (req, res) => {
   const { usuario_email } = req.body;
   if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo" });
@@ -713,7 +715,8 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
     for (let i = 2; i <= worksheet.rowCount; i++) {
       const row = worksheet.getRow(i);
       const nombre = cellToString(row.getCell(1).value);
-      const DNI = cellToString(row.getCell(2).value);
+      const DNIraw = cellToString(row.getCell(2).value);
+      const DNI = normalizarDNI(DNIraw); // <--- normalización aquí
       const correo = cellToString(row.getCell(3).value);
       const fechaIngCell = row.getCell(4).value;
       const fechaSalCell = row.getCell(5).value;
@@ -731,7 +734,11 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
         .request()
         .input("DNI", sql.VarChar, DNI)
         .input("correo", sql.VarChar, correo)
-        .query("SELECT COUNT(*) AS existe FROM Empleado WHERE DNI = @DNI OR correo = @correo");
+        .query(`
+          SELECT COUNT(*) AS existe 
+          FROM Empleado 
+          WHERE REPLACE(REPLACE(DNI,'-',''),' ','') = @DNI OR correo = @correo
+        `);
       if (existe.recordset[0].existe > 0) continue;
 
       const fecha_ingreso = fechaIngCell instanceof Date ? fechaIngCell : (fechaIngCell ? new Date(cellToString(fechaIngCell)) : null);
@@ -780,5 +787,6 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
     res.status(500).json({ error: "Error al importar Excel" });
   }
 });
+
 
 export default router;

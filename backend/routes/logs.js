@@ -17,9 +17,8 @@ const parseHasta = (fechaStr) => {
   return fecha;
 };
 
-// ============================
 // GET /logs
-// ============================
+
 router.get("/", async (req, res) => {
   const { desde, hasta } = req.query;
 
@@ -52,9 +51,8 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ============================
 // GET /logs/exportar
-// ============================
+
 router.get("/exportar", async (req, res) => {
   const { desde, hasta } = req.query;
 

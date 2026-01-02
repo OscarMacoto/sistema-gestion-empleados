@@ -53,6 +53,16 @@ const FotoInput = ({ foto, setFoto }) => {
   );
 };
 
+//Formato al DNI
+
+const formatDNI = (value) => {
+  if (!value) return "";
+  const digits = String(value).replace(/\D/g, "").slice(0, 13);
+  const parte1 = digits.slice(0, 4);
+  const parte2 = digits.slice(4, 8);
+  const parte3 = digits.slice(8);
+  return [parte1, parte2, parte3].filter(Boolean).join("-");
+};
 
 const Empleado = () => {
   const { accounts } = useMsal();
@@ -155,15 +165,14 @@ setTotalPaginas(res.data.totalPages || 1);
   const formatFecha = (fecha) => {
   if (!fecha) return "";
 
-  // Separar YYYY-MM-DD
   const parts = fecha.split("-"); 
   if (parts.length < 3) return "";
 
   const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10) - 1; // Mes en JS va de 0-11
+  const month = parseInt(parts[1], 10) - 1;
   const day = parseInt(parts[2], 10);
 
-  const d = new Date(year, month, day); // Esto crea la fecha en hora local
+  const d = new Date(year, month, day); 
   return d.toLocaleDateString("es-HN", {
     day: "2-digit",
     month: "2-digit",
@@ -778,7 +787,7 @@ const importarExcel = async (file) => {
             {empleadosActuales.map((emp) => (
               <tr key={emp.id_empleado} className="hover:bg-blue-100">
                 <td className="p-2 border">{emp.nombre}</td>
-                <td className="p-2 border">{emp.DNI}</td>
+                <td className="p-2 border">{formatDNI(emp.DNI)}</td>
                 <td className="p-2 border">{emp.correo}</td>
                 <td className="p-2 border">{emp.telefono}</td>
                 <td className="p-2 border">{emp.direccion}</td>
