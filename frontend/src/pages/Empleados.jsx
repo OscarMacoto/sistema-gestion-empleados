@@ -430,8 +430,19 @@ const importarExcel = async (file) => {
       { headers: { "Content-Type": "multipart/form-data" } }
     );
 
-    alert("Empleados importados correctamente.");
-    obtenerEmpleados();
+     const res = await axios.post(
+      "http://localhost:5000/api/empleados/importar",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    if (res.data?.success) {
+      alert("Empleados importados correctamente.");
+      await obtenerEmpleados();
+    } else {
+      alert("La importación terminó con advertencias.");
+    }
+
   } catch (error) {
     console.error("Error al importar Excel:", error);
     alert("No se pudo importar el archivo. Verifica el formato del Excel.");

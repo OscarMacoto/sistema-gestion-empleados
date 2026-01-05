@@ -21,7 +21,7 @@ async function testConnection() {
 
     await pool.close();
   } catch (err) {
-    console.error("❌ Error detalle:", JSON.stringify(err, null, 2));
+    console.error("Error detalle:", JSON.stringify(err, null, 2));
   }
 }
 

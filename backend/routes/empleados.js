@@ -515,8 +515,6 @@ router.put("/:id", async (req, res) => {
     if (!auth.ok) return res.status(403).json({ error: auth.error });
 
     const usuarioActual = auth.usuario;
-
-    // Obtener estado anterior
     const prev = await pool
       .request()
       .input("id", sql.Int, Number(id))
@@ -690,33 +688,55 @@ router.delete("/:id", async (req, res) => {
 
 const normalizarDNI = (dni) => (dni ? dni.replace(/[\s-]/g, "") : "");
 
+const parseExcelDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date && !isNaN(value)) {
+    return value;
+  }
+  if (typeof value === "number") {
+    return new Date(Math.round((value - 25569) * 86400 * 1000));
+  }
+  if (typeof value === "string") {
+    const iso = value.match(/^\d{4}-\d{2}-\d{2}$/);
+    if (iso) return new Date(value);
+  }
+  return null;
+};
+
+
 router.post("/importar", upload.single("archivo"), async (req, res) => {
   const { usuario_email } = req.body;
-  if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo" });
-  if (!usuario_email) return res.status(400).json({ error: "Falta usuario_email" });
+  if (!req.file) {
+    return res.status(400).json({ error: "No se subió ningún archivo" });
+  }
+  if (!usuario_email) {
+    return res.status(400).json({ error: "Falta usuario_email" });
+  }
 
   const filePath = req.file.path;
+
   try {
     const pool = await connectDB();
     pool.config.requestTimeout = 60000;
 
     const auth = await verificarRoles(pool, usuario_email, [PERMS.ADMIN, PERMS.RRHH]);
     if (!auth.ok) {
-      try { fs.unlinkSync(filePath); } catch (e) {}
+      try { fs.unlinkSync(filePath); } catch {}
       return res.status(403).json({ error: auth.error });
     }
-    const usuarioActual = auth.usuario;
 
+    const usuarioActual = auth.usuario;
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
     const worksheet = workbook.getWorksheet(1);
+
     const empleadosAgregados = [];
 
     for (let i = 2; i <= worksheet.rowCount; i++) {
       const row = worksheet.getRow(i);
       const nombre = cellToString(row.getCell(1).value);
       const DNIraw = cellToString(row.getCell(2).value);
-      const DNI = normalizarDNI(DNIraw); // <--- normalización aquí
+      const DNI = normalizarDNI(DNIraw);
       const correo = cellToString(row.getCell(3).value);
       const fechaIngCell = row.getCell(4).value;
       const fechaSalCell = row.getCell(5).value;
@@ -741,8 +761,9 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
         `);
       if (existe.recordset[0].existe > 0) continue;
 
-      const fecha_ingreso = fechaIngCell instanceof Date ? fechaIngCell : (fechaIngCell ? new Date(cellToString(fechaIngCell)) : null);
-      const fecha_salida = fechaSalCell instanceof Date ? fechaSalCell : (fechaSalCell ? new Date(cellToString(fechaSalCell)) : null);
+      const fecha_ingreso = parseExcelDate(fechaIngCell);
+      const fecha_salida = parseExcelDate(fechaSalCell);
+
 
       const insertResult = await pool
         .request()
@@ -778,15 +799,28 @@ router.post("/importar", upload.single("archivo"), async (req, res) => {
           VALUES (@id_empleado, @accion, GETDATE(), @usuario, @detalles)
         `);
     }
+      try {
+      fs.unlinkSync(filePath);
+    } catch (e) {
+      console.warn("No se pudo borrar archivo temporal:", e.message);
+    }
 
-    try { fs.unlinkSync(filePath); } catch (e) {}
-    res.json({ success: true, message: "Archivo importado correctamente", empleados: empleadosAgregados });
+    return res.status(200).json({
+      success: true,
+      message: "Archivo importado correctamente",
+      empleados: empleadosAgregados,
+    });
+
   } catch (err) {
-    try { fs.unlinkSync(filePath); } catch (e) {}
+    try { fs.unlinkSync(filePath); } catch {}
     console.error("POST /importar error:", err);
-    res.status(500).json({ error: "Error al importar Excel" });
+
+    return res.status(500).json({
+      success: false,
+      error: "Error al importar Excel",
+    });
   }
 });
-
+    
 
 export default router;
