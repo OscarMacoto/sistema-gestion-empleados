@@ -298,6 +298,12 @@ const agregarEmpleado = async () => {
     return false;
   }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(correo)) {
+    alert("El correo electrónico no tiene un formato válido.");
+    return false;
+  }
+
   if (!/^\d+$/.test(telefono)) {
     alert("El teléfono solo debe contener números.");
     return false;

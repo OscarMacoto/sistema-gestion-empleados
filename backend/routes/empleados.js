@@ -576,7 +576,7 @@ router.put("/:id", async (req, res) => {
       request.input("direccion", sql.VarChar, direccion);
     }
 
-    const ESTADOS_CON_SALIDA = [2, 3]; // Renuncia, Despedido
+    const ESTADOS_CON_SALIDA = [2, 3];
 
       if (id_estado !== undefined) {
         updates.push(`
