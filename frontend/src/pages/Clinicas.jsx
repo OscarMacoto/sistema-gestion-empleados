@@ -24,22 +24,36 @@ function Clinicas() {
     setNuevaClinica({ ...nuevaClinica, [e.target.name]: e.target.value });
   };
 
-  const agregarClinica = async () => {
-    try {
-      await fetch("http://localhost:5000/api/clinicas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nuevaClinica),
-      });
-      alert("Clínica agregada correctamente");
-      setNuevaClinica({ nombre_clinica: "" });
-      setMostrarFormulario(false);
-      cargarClinicas();
-    } catch (error) {
-      alert("Error al agregar clínica");
-      console.error(error);
+  
+const [guardando, setGuardando] = useState(false);
+
+const agregarClinica = async () => {
+  try {
+    setGuardando(true);
+    const response = await fetch("http://localhost:5000/api/clinicas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(nuevaClinica),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      alert(errorData.error || "Error al agregar clínica");
+      return;
     }
-  };
+
+    alert("Clínica agregada correctamente");
+    setNuevaClinica({ nombre_clinica: "" });
+    setMostrarFormulario(false);
+    cargarClinicas();
+  } catch (error) {
+    alert("Error al agregar clínica");
+    console.error(error);
+  } finally {
+    setGuardando(false);
+  }
+};
+
 
   const filtrados = Array.isArray(clinicas)
     ? clinicas.filter(c =>
@@ -66,17 +80,18 @@ function Clinicas() {
           className="border p-2 w-full rounded-lg mr-4"
         />
         <button
-           onClick={() => !agregarClinicaDeshabilitado && setMostrarFormulario(!mostrarFormulario)}
+          onClick={() => !agregarClinicaDeshabilitado && setMostrarFormulario(!mostrarFormulario)}
           disabled={agregarClinicaDeshabilitado}
           className={`px-4 py-2 rounded text-white 
-            ${agregarClinicaDeshabilitado 
-              ? "bg-gray-400 cursor-not-allowed" 
-              : "bg-green-600 hover:bg-green-700"
+            ${agregarClinicaDeshabilitado
+              ? "bg-gray-400 cursor-not-allowed"
+              : mostrarFormulario
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-green-600 hover:bg-green-700"
             }`}
->
-  {mostrarFormulario ? "Cancelar" : "Agregar clínica"}
-</button>
-
+        >
+          {mostrarFormulario ? "Cancelar" : "Agregar clínica"}
+        </button>
       </div>
 
       {mostrarFormulario && (
@@ -91,9 +106,12 @@ function Clinicas() {
           />
           <button
             onClick={agregarClinica}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Guardar clínica
+            disabled={guardando || !nuevaClinica.nombre_clinica.trim()}
+            className={`px-4 py-2 rounded text-white 
+                ${guardando ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}
+              `}
+            >
+          {guardando ? "Guardando..." : "Guardar clínica"}
           </button>
         </div>
       )}

@@ -19,6 +19,8 @@ router.get("/", async (req, res) => {
   }
 });
 
+
+
 // Agregar nueva clínica
 router.post("/", async (req, res) => {
   const { nombre_clinica } = req.body;
@@ -29,9 +31,22 @@ router.post("/", async (req, res) => {
 
   try {
     const pool = await connectDB();
+    const existe = await pool
+      .request()
+      .input("nombre_clinica", sql.VarChar, nombre_clinica.trim())
+      .query(`
+        SELECT TOP 1 id_clinica
+        FROM Clinica
+        WHERE nombre_clinica COLLATE SQL_Latin1_General_CP1_CI_AI = @nombre_clinica COLLATE SQL_Latin1_General_CP1_CI_AI
+      `);
+
+    if (existe.recordset.length > 0) {
+      return res.status(409).json({ error: "Ya existe una clínica con ese nombre." });
+    }
+
     const insertResult = await pool
       .request()
-      .input("nombre_clinica", sql.VarChar, nombre_clinica)
+      .input("nombre_clinica", sql.VarChar, nombre_clinica.trim())
       .query(`
         INSERT INTO Clinica (nombre_clinica)
         OUTPUT INSERTED.id_clinica, INSERTED.nombre_clinica
