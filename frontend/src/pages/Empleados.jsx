@@ -180,6 +180,21 @@ setTotalPaginas(res.data.totalPages || 1);
   });
 };
 
+const resetNuevoEmpleado = () => {
+  setNuevoEmpleado({
+    nombre: "",
+    DNI: "",
+    correo: "",
+    telefono: "",
+    direccion: "",
+    id_estado: "",
+    id_clinica: "",
+    id_rol: "",
+    foto: null,
+  });
+};
+
+
 
 // ADD (POST) EMPLEADO
   const handleChangeNuevo = (e) => {
@@ -224,17 +239,7 @@ const agregarEmpleado = async () => {
   try {
     await axios.post("http://localhost:5000/api/empleados", empleadoAGuardar);
     alert("Empleado agregado correctamente.");
-    setNuevoEmpleado({
-      nombre: "",
-      DNI: "",
-      correo: "",
-      telefono: "",
-      direccion: "",
-      id_estado: "",
-      id_clinica: "",
-      id_rol: "",
-      foto: null,
-    });
+    resetNuevoEmpleado();
     setMostrarFormulario(false);
     obtenerEmpleados();
   } catch (error) {
@@ -540,17 +545,26 @@ const importarExcel = async (file) => {
       
       {/* BOTONES DE ACCIONES */}
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <button
-        onClick={() => setMostrarFormulario(!mostrarFormulario)}
-        className={`text-white px-4 py-2 rounded transition-colors
-          ${
-            mostrarFormulario
-              ? "bg-red-600 hover:bg-red-700"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
+         <button
+          onClick={() => {
+            if (mostrarFormulario) {
+              resetNuevoEmpleado();
+              setMostrarFormulario(false);
+            } else {
+              setMostrarFormulario(true);
+            }
+          }}
+          className={`text-white px-4 py-2 rounded transition-colors
+            ${
+              mostrarFormulario
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
         >
           {mostrarFormulario ? "Cancelar" : "Agregar empleado"}
         </button>
+
+
 
         <div className="flex gap-2 flex-wrap">
           {/* EXPORTAR */}
