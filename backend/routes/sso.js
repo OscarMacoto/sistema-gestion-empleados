@@ -3,9 +3,11 @@ import { connectDB } from "../db.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+// GET /sso
+router.get("/", async (req, res, next) => {
   try {
     const pool = await connectDB();
+
     const result = await pool.request().query(`
       SELECT 
         e.id_empleado, 
@@ -14,10 +16,11 @@ router.get("/", async (req, res) => {
       FROM CuentaSSO c 
       INNER JOIN Empleado e ON c.id_empleado = e.id_empleado
     `);
+
     res.json(result.recordset);
   } catch (err) {
-    console.error("Error al obtener cuentas SSO:", err);
-    res.status(500).json({ error: "Error al obtener cuentas SSO" });
+    err.context = "GET /sso";
+    next(err);
   }
 });
 

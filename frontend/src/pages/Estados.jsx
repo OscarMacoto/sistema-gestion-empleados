@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 
 function Estados() {
@@ -25,13 +26,18 @@ function Estados() {
 
   return (
     <div className="p-6 bg-white rounded-2xl shadow-md">
-      <h2 className="text-2xl font-bold mb-4 text-center">Estados de Empleado</h2>
+      <h2 className="text-2xl font-bold mb-4 text-center">
+        Estados de Empleado
+      </h2>
 
       <input
         type="text"
         placeholder="Buscar estado..."
         value={busqueda}
-        onChange={e => setBusqueda(e.target.value)}
+        onChange={e => {
+          setBusqueda(e.target.value);
+          setPagina(1);
+        }}
         className="border p-2 mb-4 w-full rounded-lg"
       />
 
@@ -49,6 +55,14 @@ function Estados() {
               <td className="py-2">{e.estado}</td>
             </tr>
           ))}
+
+          {filtrados.length === 0 && (
+            <tr>
+              <td colSpan="2" className="py-4 text-gray-500">
+                No se encontraron estados.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 
@@ -60,12 +74,14 @@ function Estados() {
         >
           ⬅️
         </button>
+
         <span>
-          Página {pagina} de {totalPaginas}
+          Página {pagina} de {totalPaginas || 1}
         </span>
+
         <button
           onClick={() => setPagina(pagina + 1)}
-          disabled={pagina === totalPaginas}
+          disabled={pagina === totalPaginas || totalPaginas === 0}
           className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50"
         >
           ➡️

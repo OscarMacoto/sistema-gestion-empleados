@@ -18,7 +18,7 @@ function SelfService() {
           return res.json();
         })
         .then((data) => {
-          setUserData(data);
+          setUserData(data.data);
           setLoading(false);
         })
         .catch((err) => {

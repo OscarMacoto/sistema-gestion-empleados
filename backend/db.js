@@ -13,19 +13,19 @@ const dbConfig = {
   pool: {
     max: 20,
     min: 5,
-    idleTimeoutMillis: 60000,   
+    idleTimeoutMillis: 60000,
   },
-  connectionTimeout: 30000,   
-  requestTimeout: 60000,        
+  connectionTimeout: 30000,
+  requestTimeout: 60000,
 };
 
-let pool;
+let pool = null;
 
 export async function connectDB() {
   try {
     if (pool) {
       if (!pool.connected) {
-        console.warn("Pool existía pero desconectado, reconectando...");
+        console.warn("Pool desconectado, reconectando...");
         await pool.connect();
       }
       return pool;
@@ -35,17 +35,21 @@ export async function connectDB() {
 
     pool.on("error", (err) => {
       console.error("💥 Error en el pool SQL:", err);
-      pool = null; 
+      pool = null;
     });
 
     await pool.connect();
     console.log("Pool SQL conectado correctamente");
-    return pool;
 
+    return pool;
   } catch (error) {
-    console.error("Error conectando a SQL:", error);
+    console.error("Error conectando a SQL Server:", error);
     pool = null;
-    throw error;
+    const err = new Error("No se pudo conectar a la base de datos");
+    err.status = 500;
+    err.originalError = error;
+
+    throw err;
   }
 }
 

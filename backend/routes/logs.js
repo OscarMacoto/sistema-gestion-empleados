@@ -9,7 +9,6 @@ const parseDesde = (fechaStr) => {
   return new Date(`${fechaStr}T00:00:00`);
 };
 
-
 const parseHasta = (fechaStr) => {
   if (!fechaStr) return null;
   const fecha = new Date(`${fechaStr}T00:00:00`);
@@ -18,8 +17,7 @@ const parseHasta = (fechaStr) => {
 };
 
 // GET /logs
-
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   const { desde, hasta } = req.query;
 
   try {
@@ -45,15 +43,14 @@ router.get("/", async (req, res) => {
 
     const result = await request.query(query);
     res.json(result.recordset);
-  } catch (error) {
-    console.error("Error al obtener registros:", error);
-    res.status(500).json({ error: "Error al obtener registros" });
+  } catch (err) {
+    err.context = "GET /logs";
+    next(err);
   }
 });
 
 // GET /logs/exportar
-
-router.get("/exportar", async (req, res) => {
+router.get("/exportar", async (req, res, next) => {
   const { desde, hasta } = req.query;
 
   try {
@@ -104,9 +101,9 @@ router.get("/exportar", async (req, res) => {
 
     await workbook.xlsx.write(res);
     res.end();
-  } catch (error) {
-    console.error("Error al exportar registros:", error);
-    res.status(500).json({ error: "Error al exportar registros" });
+  } catch (err) {
+    err.context = "GET /logs/exportar";
+    next(err);
   }
 });
 

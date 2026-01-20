@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { MsalProvider, useIsAuthenticated, useMsal } from "@azure/msal-react";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { useState, useEffect } from "react";
+import React from "react";
 import Logs from "./pages/Logs.jsx";
 import Empleados from "./pages/Empleados";
 import Clinicas from "./pages/Clinicas";
@@ -11,6 +12,38 @@ import SelfService from "./pages/SelfService";
 import LoginMicrosoft from "./components/LoginMicrosoft";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout.jsx";
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Error capturado por ErrorBoundary:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-gray-100">
+          <h1 className="text-3xl font-bold text-red-600">
+            Ocurrió un error inesperado
+          </h1>
+          <pre className="mt-4 text-sm text-gray-700">
+            {this.state.error?.message}
+          </pre>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 function AccesoDenegado() {
   return (
@@ -71,7 +104,6 @@ function AppContent() {
       </button>
 
       <Routes>
-        {/* Empleados — Admin y RRHH */}
         <Route
           path="/"
           element={
@@ -80,8 +112,6 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
-        {/* Clínicas — Admin y RRHH */}
         <Route
           path="/clinicas"
           element={
@@ -90,8 +120,6 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
-        {/* Estados — Admin y RRHH */}
         <Route
           path="/estados"
           element={
@@ -100,8 +128,6 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
-        {/* SSO — Admin y RRHH */}
         <Route
           path="/sso"
           element={
@@ -110,8 +136,6 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
-        {/* SelfService — Todos los roles autenticados */}
         <Route
           path="/selfservice"
           element={
@@ -120,8 +144,6 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
-        {/* Logs — SOLO Administrador */}
         <Route
           path="/logs"
           element={
@@ -130,7 +152,6 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
         <Route path="/acceso-denegado" element={<AccesoDenegado />} />
       </Routes>
     </Layout>
@@ -141,7 +162,9 @@ function App() {
   return (
     <MsalProvider instance={msalInstance}>
       <Router>
-        <AppContent />
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
       </Router>
     </MsalProvider>
   );

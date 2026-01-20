@@ -2,9 +2,25 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import axios from "axios";
 import { useMsal } from "@azure/msal-react";
 
-const SelectInput = ({ name, value, onChange, options, placeholder, disabled }) => {
-  const getId = (opt) => opt.id_estado || opt.id_clinica || opt.id_rol;
-  const getLabel = (opt) => opt.descripcion || opt.nombre_clinica || opt.nombre_rol;
+const SelectInput = ({
+  name,
+  value,
+  onChange,
+  options = [],
+  placeholder,
+  disabled,
+}) => {
+  const safeOptions = Array.isArray(options)
+    ? options
+    : Array.isArray(options?.data)
+    ? options.data
+    : [];
+
+  const getId = (opt) =>
+    opt.id_estado ?? opt.id_clinica ?? opt.id_rol;
+
+  const getLabel = (opt) =>
+    opt.descripcion ?? opt.nombre_clinica ?? opt.nombre_rol;
 
   return (
     <select
@@ -17,14 +33,21 @@ const SelectInput = ({ name, value, onChange, options, placeholder, disabled }) 
       }`}
     >
       <option value="">{placeholder}</option>
-      {options.map((opt) => (
-        <option key={getId(opt)} value={getId(opt)}>
-          {getLabel(opt)}
-        </option>
-      ))}
+
+      {safeOptions.map((opt) => {
+        const id = getId(opt);
+        if (id == null) return null;
+
+        return (
+          <option key={id} value={id}>
+            {getLabel(opt)}
+          </option>
+        );
+      })}
     </select>
   );
 };
+
 
 
 const FotoInput = ({ foto, setFoto }) => {
@@ -64,6 +87,7 @@ const formatDNI = (value) => {
   return [parte1, parte2, parte3].filter(Boolean).join("-");
 };
 
+
 const Empleado = () => {
   const { accounts } = useMsal();
   const [empleados, setEmpleados] = useState([]);
@@ -94,7 +118,39 @@ const Empleado = () => {
   const [cargandoImport, setCargandoImport] = useState(false);
   const [cargandoExport, setCargandoExport] = useState(false);
 
+ 
+const obtenerEmpleados = useCallback(async () => {
+  if (!usuarioActivo.correo) return;
 
+  try {
+    const res = await axios.get("http://localhost:5000/api/empleados", {
+      params: {
+        usuario_email: usuarioActivo.correo,
+        page: paginaActual,
+        limit: empleadosPorPagina,
+        nombre: filtroNombre,
+        estado: filtroEstado,
+        clinica: filtroClinica,
+      },
+    });
+
+    console.log("API empleados:", res.data);
+
+    setEmpleados(res.data?.data ?? []);
+    setTotalPaginas(res.data?.pagination?.totalPages ?? 1);
+
+  } catch (error) {
+    console.error("Error al obtener empleados:", error);
+    setEmpleados([]);
+    setTotalPaginas(1);
+  }
+}, [
+  usuarioActivo.correo,
+  paginaActual,
+  filtroNombre,
+  filtroEstado,
+  filtroClinica
+]);
 
   // GET USUARIO ACTIVO
   useEffect(() => {
@@ -103,42 +159,25 @@ const Empleado = () => {
     }
   }, [accounts]);
 
+
   // GET LISTAS
 useEffect(() => {
   setPaginaActual(1);
 }, [filtroNombre, filtroEstado, filtroClinica]);
 
-
- const obtenerEmpleados = useCallback(async () => {
-  if (!usuarioActivo.correo) return;
-
-  const res = await axios.get("http://localhost:5000/api/empleados", {
-    params: {
-      usuario_email: usuarioActivo.correo,
-      page: paginaActual,
-      limit: empleadosPorPagina,
-      nombre: filtroNombre,
-      estado: filtroEstado,
-      clinica: filtroClinica,
-    },
-});
-
-setEmpleados(res.data.empleados || []);
-setTotalPaginas(res.data.totalPages || 1);
-}, [usuarioActivo, paginaActual, filtroNombre, filtroEstado, filtroClinica]);
-  const obtenerEstados = async () => {
+const obtenerEstados = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/empleados/estados/lista");
-      setEstados(res.data);
+      setEstados(res.data.data);
     } catch (error) {
       console.error("Error al obtener estados:", error);
     }
-  };
+};
 
   const obtenerClinicas = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/empleados/clinicas/lista");
-      setClinicas(res.data);
+      setClinicas(res.data.data);
     } catch (error) {
       console.error("Error al obtener clínicas:", error);
     }
@@ -147,7 +186,7 @@ setTotalPaginas(res.data.totalPages || 1);
   const obtenerRoles = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/empleados/roles/lista");
-      setRoles(res.data);
+      setRoles(res.data.data);
     } catch (error) {
       console.error("Error al obtener roles:", error);
     }
@@ -225,9 +264,12 @@ const agregarEmpleado = async () => {
       ? new Date()
       : null;
 
+  
   const empleadoAGuardar = {
     ...nuevoEmpleado,
     telefono: telefonoNormalizado,
+    id_estado: Number(nuevoEmpleado.id_estado),
+    id_clinica: Number(nuevoEmpleado.id_clinica),
     id_rol:
       Number(nuevoEmpleado.id_rol) ||
       roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
@@ -235,6 +277,7 @@ const agregarEmpleado = async () => {
     usuario_email: usuarioActivo.correo,
     fecha_salida: fechaSalida,
   };
+
 
   try {
     await axios.post("http://localhost:5000/api/empleados", empleadoAGuardar);
@@ -425,9 +468,11 @@ const exportarExcel = async () => {
 
 //Importar Excel
 
+
 const importarExcel = async (file) => {
   if (cargandoImport) return;
   if (!file) return alert("Selecciona un archivo primero.");
+
   setCargandoImport(true);
 
   try {
@@ -435,19 +480,13 @@ const importarExcel = async (file) => {
     formData.append("archivo", file);
     formData.append("usuario_email", usuarioActivo.correo);
 
-    await axios.post(
+    const res = await axios.post(
       "http://localhost:5000/api/empleados/importar",
       formData,
       { headers: { "Content-Type": "multipart/form-data" } }
     );
 
-     const res = await axios.post(
-      "http://localhost:5000/api/empleados/importar",
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
-
-    if (res.data?.success) {
+    if (res.data.success) {
       alert("Empleados importados correctamente.");
       await obtenerEmpleados();
     } else {
@@ -461,6 +500,7 @@ const importarExcel = async (file) => {
     setCargandoImport(false);
   }
 };
+
 
   const Paginacion = ({ totalPaginas, paginaActual, setPaginaActual }) => {
   const maxBotones = 7;
@@ -652,11 +692,17 @@ const importarExcel = async (file) => {
           <SelectInput
             name="id_rol"
             value={nuevoEmpleado.id_rol}
-            onChange={handleChangeNuevo}
+            onChange={(e) =>
+              setEmpleadoEditando({
+                ...nuevoEmpleado,
+                id_rol: e.target.value,
+              })
+            }
             options={roles}
-            placeholder="Selecciona un rol"
+            placeholder="Seleccione Rol..."
             disabled={rolDeshabilitado}
           />
+
           <FotoInput
             foto={nuevoEmpleado.foto}
             setFoto={(foto) =>
@@ -703,17 +749,19 @@ const importarExcel = async (file) => {
               options={clinicas}
               placeholder="Seleccionar clínica..."
             />
-            <SelectInput
+            <SelectInput 
               name="id_rol"
-              value={nuevoEmpleado.id_rol}
+              value={empleadoEditando.id_rol}
               onChange={(e) =>
-                setNuevoEmpleado({ ...nuevoEmpleado, id_rol: e.target.value })
+                setEmpleadoEditando({
+                 ...empleadoEditando,
+                 id_rol: e.target.value, 
+                })
               }
               options={roles}
               placeholder="Seleccione Rol..."
               disabled={rolDeshabilitado}
             />
-
             <input
               type="text"
               name="telefono"
