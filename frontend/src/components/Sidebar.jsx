@@ -1,11 +1,12 @@
-
 import { NavLink } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
+import { useLogout } from "../hooks/useLogout";
 
 function Sidebar() {
-  const { instance, accounts } = useMsal();
+  const { accounts } = useMsal();
+  const { handleLogout } = useLogout();
   const [rolUsuario, setRolUsuario] = useState(null);
 
   useEffect(() => {
@@ -24,14 +25,6 @@ function Sidebar() {
       window.removeEventListener("storage", updateRole);
     };
   }, []);
-
-  const handleLogout = () => {
-    instance.logoutPopup().catch((e) => console.error("Logout error:", e));
-    localStorage.removeItem("usuario_rol");
-    localStorage.removeItem("usuario_email");
-    localStorage.removeItem("usuario_nombre");
-    window.dispatchEvent(new Event("role-updated"));
-  };
 
   const links = [
     { to: "/dashboard", label: "Dashboard", roles: ["Administrador", "RRHH"] },
@@ -83,6 +76,7 @@ function Sidebar() {
           <>
             <p className="mb-2 font-semibold">Hola, {accounts[0].name}</p>
             <button
+              type="button"
               onClick={handleLogout}
               className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
             >

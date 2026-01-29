@@ -1,37 +1,42 @@
 import { useMsal } from "@azure/msal-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLogout } from "../hooks/useLogout";
 
 function LoginMicrosoft() {
   const { instance, accounts } = useMsal();
   const navigate = useNavigate();
+  const { handleLogout } = useLogout();
 
   useEffect(() => {
     const iniciarSesionExistente = async () => {
       if (accounts.length > 0) {
-        instance.setActiveAccount(accounts[0]);
+        try {
+          instance.setActiveAccount(accounts[0]);
 
-        const email = accounts[0].username;
+          const email = accounts[0].username;
 
-        const rolResponse = await fetch(
-          `http://localhost:5000/api/empleados/rol/${email}`
-        );
-        const rolData = await rolResponse.json();
-        const rol = rolData?.descripcion || "Empleado";
+          const rolResponse = await fetch(
+            `http://localhost:5000/api/empleados/rol/${email}`
+          );
+          const rolData = await rolResponse.json();
+          const rol = rolData?.descripcion || "Empleado";
 
-        localStorage.setItem("usuario_rol", rol);
+          localStorage.setItem("usuario_rol", rol);
 
-        if (rol === "Empleado de planta") {
-          navigate("/selfservice");
-        } else {
-          navigate("/");
+          if (rol === "Empleado de planta") {
+            navigate("/selfservice");
+          } else {
+            navigate("/");
+          }
+        } catch (e) {
+          console.error("Error al recuperar sesión existente:", e);
         }
       }
     };
 
     iniciarSesionExistente();
   }, [accounts, instance, navigate]);
-
 
   const handleLogin = async () => {
     try {
@@ -51,7 +56,6 @@ function LoginMicrosoft() {
       );
       const empleadoData = await empleadoRes.json();
 
-      // Obtener rol
       const rolRes = await fetch(
         `http://localhost:5000/api/empleados/rol/${email}`
       );
@@ -61,13 +65,10 @@ function LoginMicrosoft() {
       localStorage.setItem("usuario_rol", rolData?.descripcion || "Empleado");
       window.dispatchEvent(new Event("role-updated"));
 
-
-      // Guardar datos
       localStorage.setItem("usuario_email", email);
       localStorage.setItem("usuario_nombre", nombreCompleto);
       localStorage.setItem("usuario_rol", rol);
 
-      // Actualizar último login
       await fetch("http://localhost:5000/api/auth/actualizar-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -79,20 +80,9 @@ function LoginMicrosoft() {
       } else {
         navigate("/");
       }
-
     } catch (error) {
       console.error("Error en login:", error);
     }
-  };
-
-  const handleLogout = () => {
-    instance.setActiveAccount(null);
-
-    localStorage.removeItem("usuario_email");
-    localStorage.removeItem("usuario_nombre");
-    localStorage.removeItem("usuario_rol");
-
-    navigate("/");
   };
 
   return (
@@ -104,8 +94,11 @@ function LoginMicrosoft() {
 
         {accounts.length === 0 ? (
           <>
-            <p className="text-gray-600 mb-4">Inicia sesión con tu correo de ELEOS</p>
+            <p className="text-gray-600 mb-4">
+              Inicia sesión con tu correo de ELEOS
+            </p>
             <button
+              type="button"
               onClick={handleLogin}
               className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
             >
@@ -120,6 +113,7 @@ function LoginMicrosoft() {
               <strong>{accounts[0].name}</strong>
             </p>
             <button
+              type="button"
               onClick={handleLogout}
               className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition"
             >

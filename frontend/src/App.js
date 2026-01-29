@@ -1,8 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { MsalProvider, useIsAuthenticated, useMsal } from "@azure/msal-react";
-import { PublicClientApplication } from "@azure/msal-browser";
+import { MsalProvider, useIsAuthenticated } from "@azure/msal-react";
+import { PublicClientApplication, BrowserCacheLocation } from "@azure/msal-browser";
 import { useState, useEffect } from "react";
 import React from "react";
+
 import Logs from "./pages/Logs.jsx";
 import Empleados from "./pages/Empleados";
 import Clinicas from "./pages/Clinicas";
@@ -13,8 +14,8 @@ import LoginMicrosoft from "./components/LoginMicrosoft";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
-import { BrowserCacheLocation } from "@azure/msal-browser";
 
+import { useLogout } from "./hooks/useLogout";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -56,13 +57,10 @@ function AccesoDenegado() {
   );
 }
 
-
-
 const msalConfig = {
   auth: {
     clientId: "d317992c-f1f6-4ecf-8bb5-bc4ad085b979",
-    authority:
-      "https://login.microsoftonline.com/d7d9814e-2d7a-4cf4-b34d-b3ad99396e3f",
+    authority: "https://login.microsoftonline.com/d7d9814e-2d7a-4cf4-b34d-b3ad99396e3f",
     redirectUri: window.location.origin,
   },
   cache: {
@@ -71,19 +69,14 @@ const msalConfig = {
   },
 };
 
-
 const msalInstance = new PublicClientApplication(msalConfig);
 
 function AppContent() {
   const isAuthenticated = useIsAuthenticated();
-  const { instance } = useMsal();
   const [showWelcome, setShowWelcome] = useState(true);
 
-  const handleLogout = () => {
-    instance.logoutPopup({ postLogoutRedirectUri: window.location.origin });
-    localStorage.removeItem("usuario_rol");
-    window.dispatchEvent(new Event("role-updated"));
-  };
+  // 👇 Usa el hook de logout
+  const { handleLogout } = useLogout();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -107,6 +100,7 @@ function AppContent() {
   return (
     <Layout>
       <button
+        type="button"
         onClick={handleLogout}
         className="mb-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
       >
