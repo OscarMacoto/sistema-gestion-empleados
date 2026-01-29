@@ -4,11 +4,13 @@ import { connectDB } from "../db.js";
 
 const router = express.Router();
 
-router.post("/actualizar-login", async (req, res) => {
+router.post("/actualizar-login", async (req, res, next) => {
   const { id_empleado } = req.body;
 
   if (!id_empleado) {
-    return res.status(400).json({ error: "Falta el id_empleado" });
+    return res.status(400).json({
+      error: "Falta el id_empleado"
+    });
   }
 
   try {
@@ -35,11 +37,8 @@ router.post("/actualizar-login", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("POST /actualizar-login error:", err);
-
-    return res.status(500).json({
-      error: "Error interno al actualizar el login",
-    });
+    err.context = "POST /auth/actualizar-login";
+    next(err);
   }
 });
 

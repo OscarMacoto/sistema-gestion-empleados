@@ -1,21 +1,26 @@
+
 import express from "express";
 import { connectDB } from "../db.js";
 
 const router = express.Router();
 
-// GET /estados
+// GET /areas
 router.get("/", async (req, res, next) => {
   try {
     const pool = await connectDB();
+
     const result = await pool.request().query(`
-      SELECT id_estado, descripcion AS estado
-      FROM Estado_empleado
-      ORDER BY id_estado
+      SELECT 
+        id_area, 
+        nombre_area
+      FROM Area
+      ORDER BY id_area
     `);
 
     res.json(result.recordset);
   } catch (err) {
-    err.context = "GET /estados";
+    console.error("Error al obtener áreas:", err);
+    err.context = "GET /areas";
     next(err);
   }
 });

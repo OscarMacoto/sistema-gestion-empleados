@@ -17,10 +17,10 @@ const SelectInput = ({
     : [];
 
   const getId = (opt) =>
-    opt.id_estado ?? opt.id_clinica ?? opt.id_rol;
+    opt.id_estado ?? opt.id_clinica ?? opt.id_rol ?? opt.id_area;
 
   const getLabel = (opt) =>
-    opt.descripcion ?? opt.nombre_clinica ?? opt.nombre_rol;
+    opt.descripcion ?? opt.nombre_clinica ?? opt.nombre_rol ?? opt.nombre_area;;
 
   return (
     <select
@@ -48,27 +48,36 @@ const SelectInput = ({
   );
 };
 
-
-
-const FotoInput = ({ foto, setFoto }) => {
+const FotoInput = ({ foto, setFoto, showPreview = true }) => {
   const handleChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onloadend = () => setFoto(reader.result.split(",")[1]);
-    reader.readAsDataURL(file);
+    reader.onloadend = () => {
+      const base64 = reader.result.split(",")[1];
+
+      if (base64 && typeof base64 === "string") {
+        setFoto(base64);
+      }
     };
+
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div>
       <input
         type="file"
+        accept="image/*"
         onChange={handleChange}
         className="p-2 border rounded text-sm"
       />
-      {foto && (
+
+      {showPreview && foto && (
         <img
           src={`data:image/jpeg;base64,${foto}`}
-          alt="Empleado"
+          alt="Preview"
           className="w-24 h-24 rounded-2xl object-cover shadow-md border border-gray-200 mt-2"
         />
       )}
@@ -76,8 +85,8 @@ const FotoInput = ({ foto, setFoto }) => {
   );
 };
 
-//Formato al DNI
 
+//Formato al DNI
 const formatDNI = (value) => {
   if (!value) return "";
   const digits = String(value).replace(/\D/g, "").slice(0, 13);
@@ -106,6 +115,8 @@ const Empleado = () => {
     id_estado: "",
     id_clinica: "",
     id_rol: 3,
+    id_area: "",
+    puesto: "",
     foto: null,
   });
   const [empleadoEditando, setEmpleadoEditando] = useState(null);
@@ -113,12 +124,42 @@ const Empleado = () => {
   const [estados, setEstados] = useState([]);
   const [clinicas, setClinicas] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [areas, setAreas] = useState([]);
   const [usuarioActivo, setUsuarioActivo] = useState({ nombre: "", correo: "" });
   const inputFileRef = useRef(null);
   const [cargandoImport, setCargandoImport] = useState(false);
   const [cargandoExport, setCargandoExport] = useState(false);
 
- 
+
+  
+const seleccionarEmpleado = async (id) => {
+  try {
+    const res = await axios.get(`http://localhost:5000/api/empleados/${id}`);
+    const emp = res.data;
+
+    console.log("EMP GET ID:", emp);
+
+    setEmpleadoEditando({
+      ...emp,
+      id_estado: emp.id_estado ?? "",
+      id_clinica: emp.id_clinica ?? "",
+      id_rol: emp.id_rol ?? "",
+      id_area: emp.id_area ?? "",
+      foto:
+        typeof emp.foto === "string" &&
+        emp.foto.trim() !== ""
+          ? emp.foto
+          : null
+    });
+
+  } catch (err) {
+    console.error("ERROR GET EMPLEADO ID:", err.response?.data || err);
+    alert("No se pudo cargar la información del empleado.");
+  }
+};
+
+
+  
 const obtenerEmpleados = useCallback(async () => {
   if (!usuarioActivo.correo) return;
 
@@ -192,11 +233,23 @@ const obtenerEstados = async () => {
     }
   };
 
+  
+    const obtenerAreas = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/api/empleados/areas/lista");
+        setAreas(res.data.data);
+      } catch (error) {
+        console.error("Error al obtener áreas:", error);
+      }
+    };
+
+
   useEffect(() => {
     obtenerEmpleados();
     obtenerEstados();
     obtenerClinicas();
     obtenerRoles();
+    obtenerAreas();
   }, [obtenerEmpleados]);
 
   const empleadosActuales = empleados;
@@ -236,13 +289,25 @@ const resetNuevoEmpleado = () => {
 
 
 // ADD (POST) EMPLEADO
-  const handleChangeNuevo = (e) => {
-    let value = e.target.value;
-    if (e.target.name === "DNI" || e.target.name === "telefono") {
-      value = value.replace(/\D/g, "");
-    }
-    setNuevoEmpleado({ ...nuevoEmpleado, [e.target.name]: value });
-  };
+
+const handleChangeNuevo = (e) => {
+  let { name, value } = e.target;
+  const camposNumericos = ["id_estado", "id_clinica", "id_rol", "id_area"];
+  if (name === "id_area" && value === "") {
+    value = null;
+  }
+  if (camposNumericos.includes(name) && value !== "" && value !== null) {
+    value = Number(value);
+  }
+  if (name === "DNI" || name === "telefono") {
+    value = value.replace(/\D/g, "");
+  }
+  setNuevoEmpleado((prev) => ({
+    ...prev,
+    [name]: value,
+  }));
+};
+
 
 
 const agregarEmpleado = async () => {
@@ -274,6 +339,8 @@ const agregarEmpleado = async () => {
       Number(nuevoEmpleado.id_rol) ||
       roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
       3,
+    id_area : Number(nuevoEmpleado.id_area),
+    puesto: nuevoEmpleado.puesto,
     usuario_email: usuarioActivo.correo,
     fecha_salida: fechaSalida,
   };
@@ -292,27 +359,32 @@ const agregarEmpleado = async () => {
 };
 //  VALIDADORES 
 
-  const validarEmpleadoEditado = () => {
-    if (
-      !empleadoEditando.id_estado ||
-      !empleadoEditando.id_clinica ||
-      !empleadoEditando.id_rol ||
-      !empleadoEditando.telefono?.trim() ||
-      !empleadoEditando.direccion?.trim()
-    ) {
-      alert("Todos los campos son obligatorios.");
-      return false;
-    }
+  
+const validarEmpleadoEditado = () => {
+  if (
+    !empleadoEditando.id_estado ||
+    !empleadoEditando.id_clinica ||
+    !empleadoEditando.id_rol ||
+    !empleadoEditando.id_area ||
+    !empleadoEditando.puesto?.trim() ||
+    !empleadoEditando.telefono?.trim() ||
+    !empleadoEditando.direccion?.trim()
+  ) {
+    alert("Todos los campos son obligatorios.");
+    return false;
+  }
 
-    if (empleadoEditando.telefono.length < 8 || empleadoEditando.telefono.length > 8) {
-      alert("El teléfono debe tener 8 dígitos.");
-      return false;
-    }
+  if (empleadoEditando.telefono.length < 8 || empleadoEditando.telefono.length > 8) {
+    alert("El teléfono debe tener 8 dígitos.");
+    return false;
+  }
 
-    return true;
-  };
+  return true;
+};
 
-  const validarNuevoEmpleado = () => {
+
+
+const validarNuevoEmpleado = () => {
   const {
     nombre,
     DNI,
@@ -321,6 +393,8 @@ const agregarEmpleado = async () => {
     direccion,
     id_estado,
     id_clinica,
+    id_area,
+    puesto  
   } = nuevoEmpleado;
 
   if (
@@ -330,11 +404,14 @@ const agregarEmpleado = async () => {
     !telefono.trim() ||
     !direccion.trim() ||
     !id_estado ||
-    !id_clinica
+    !id_clinica ||
+    !id_area ||
+    !puesto?.trim()
   ) {
     alert("Todos los campos son obligatorios.");
     return false;
   }
+
 
   if (!/^\d+$/.test(DNI)) {
     alert("El DNI solo debe contener números.");
@@ -365,27 +442,6 @@ const agregarEmpleado = async () => {
   return true;
 };
 
-
-  const seleccionarEmpleado = (empleado) => {
-    setEmpleadoEditando({
-      ...empleado,
-      id_estado:
-        empleado.id_estado || estados.find((e) => e.descripcion === empleado.estado)?.id_estado || "",
-      id_clinica:
-        empleado.id_clinica ||
-        clinicas.find((c) => c.nombre_clinica === empleado.clinica)?.id_clinica ||
-        "",
-      id_rol:
-        empleado.id_rol ||
-        roles.find((r) => r.nombre_rol === empleado.rol)?.id_rol ||
-        roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
-        3,
-      telefono: empleado.telefono || "",
-      direccion: empleado.direccion || "",
-      foto: empleado.foto || null,
-    });
-  };
-
   // ACTUALIZAR EMPLEADO
   const actualizarEmpleado = async () => {
     if (!empleadoEditando.id_estado || !empleadoEditando.id_clinica) {
@@ -399,6 +455,7 @@ const agregarEmpleado = async () => {
           id_estado: Number(empleadoEditando.id_estado),
           id_clinica: Number(empleadoEditando.id_clinica),
           id_rol: Number(empleadoEditando.id_rol),
+          id_area: Number(empleadoEditando.id_area),
           telefono: empleadoEditando.telefono,
           direccion: empleadoEditando.direccion,
           usuario_email: usuarioActivo.correo,
@@ -583,7 +640,6 @@ const importarExcel = async (file) => {
     <div className="p-4">
       <h2 className="text-2xl font-bold text-center mb-6">Gestión de Empleados</h2>
       
-      {/* BOTONES DE ACCIONES */}
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
          <button
           onClick={() => {
@@ -660,69 +716,92 @@ const importarExcel = async (file) => {
         </div>
       </div>
 
-  {/* FORMULARIO NUEVO EMPLEADO */}
-    {mostrarFormulario && (
-      <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
-        <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {["nombre", "DNI", "correo", "telefono", "direccion"].map((f) => (
+  
+      {/* FORMULARIO NUEVO EMPLEADO */}
+      {mostrarFormulario && (
+        <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
+          <h3 className="text-lg font-semibold mb-2">Nuevo empleado</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {["nombre", "DNI", "correo", "telefono", "direccion"].map((f) => (
+              <input
+                key={f}
+                name={f}
+                placeholder={f}
+                value={nuevoEmpleado[f]}
+                onChange={handleChangeNuevo}
+                className="p-2 border rounded text-sm"
+              />
+            ))}
+            {/* Estado */}
+            <SelectInput
+              name="id_estado"
+              value={nuevoEmpleado.id_estado}
+              onChange={handleChangeNuevo}
+              options={estados}
+              placeholder="Seleccionar estado..."
+            />
+            {/* Clínica */}
+            <SelectInput
+              name="id_clinica"
+              value={nuevoEmpleado.id_clinica}
+              onChange={handleChangeNuevo}
+              options={clinicas}
+              placeholder="Seleccionar clínica..."
+            />
+            {/* Rol */}
+            <SelectInput
+              name="id_rol"
+              value={nuevoEmpleado.id_rol}
+              onChange={(e) =>
+                setNuevoEmpleado({
+                  ...nuevoEmpleado,
+                  id_rol: e.target.value,
+                })
+              }
+              options={roles}
+              placeholder="Seleccione Rol..."
+              disabled={rolDeshabilitado}
+            />
+            {/*Área */}
+            <SelectInput
+              name="id_area"
+              value={nuevoEmpleado.id_area}
+              onChange={handleChangeNuevo}
+              options={areas}
+              placeholder="Seleccionar área..."
+            />
+            {/*Puesto */}
             <input
-              key={f}
-              name={f}
-              placeholder={f}
-              value={nuevoEmpleado[f]}
+              name="puesto"
+              placeholder="Puesto"
+              value={nuevoEmpleado.puesto}
               onChange={handleChangeNuevo}
               className="p-2 border rounded text-sm"
             />
-          ))}
-          <SelectInput
-            name="id_estado"
-            value={nuevoEmpleado.id_estado}
-            onChange={handleChangeNuevo}
-            options={estados}
-            placeholder="Seleccionar estado..."
-          />
-          <SelectInput
-            name="id_clinica"
-            value={nuevoEmpleado.id_clinica}
-            onChange={handleChangeNuevo}
-            options={clinicas}
-            placeholder="Seleccionar clínica..."
-          />
-          <SelectInput
-            name="id_rol"
-            value={nuevoEmpleado.id_rol}
-            onChange={(e) =>
-              setEmpleadoEditando({
-                ...nuevoEmpleado,
-                id_rol: e.target.value,
-              })
-            }
-            options={roles}
-            placeholder="Seleccione Rol..."
-            disabled={rolDeshabilitado}
-          />
+            {/* Foto */}
+            <FotoInput
+              foto={nuevoEmpleado.foto}
+              setFoto={(foto) =>
+                setNuevoEmpleado({ ...nuevoEmpleado, foto })
+              }
+              showPreview={true}
+            />
+            </div>
+          {/* Botón guardar */}
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => {
+                if (!validarNuevoEmpleado()) return;
+                agregarEmpleado();
+              }}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Guardar empleado
+            </button>
+          </div>
+        </div>
+      )}
 
-          <FotoInput
-            foto={nuevoEmpleado.foto}
-            setFoto={(foto) =>
-              setNuevoEmpleado({ ...nuevoEmpleado, foto })
-            }
-          />
-        </div>
-        <div className="flex justify-center mt-4">
-          <button
-            onClick={() => {
-              if (!validarNuevoEmpleado()) return;
-              agregarEmpleado();
-            }}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Guardar empleado
-          </button>
-        </div>
-      </div>
-    )}
 
       {/* FORMULARIO EDITAR EMPLEADO */}
       {empleadoEditando && (
@@ -787,6 +866,31 @@ const importarExcel = async (file) => {
               }
               className="p-2 border rounded text-sm"
             />
+            <SelectInput
+              name="id_area"
+              value={empleadoEditando.id_area}
+              onChange={(e) =>
+                setEmpleadoEditando({
+                  ...empleadoEditando,
+                  id_area: e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+              options={areas}
+              placeholder="Seleccionar área..."
+            />
+            <input
+              type="text"
+              name="puesto"
+              placeholder="Puesto"
+              value={empleadoEditando.puesto || ""}
+              onChange={(e) =>
+                setEmpleadoEditando({
+                  ...empleadoEditando,
+                  puesto: e.target.value,
+                })
+              }
+              className="p-2 border rounded text-sm"
+            />
             <div className="flex justify-start gap-2 mt-2">
               <button
                 onClick={() => {
@@ -805,15 +909,40 @@ const importarExcel = async (file) => {
               </button>
             </div>
           </div>
-          <div>
+                  
+          <div className="flex flex-col items-center">
+            <p className="font-semibold mb-2">Foto actual</p>
+            {empleadoEditando.foto ? (
+              <img
+                src={`data:image/png;base64,${empleadoEditando.foto}`}
+                alt="Foto del empleado"
+                className="w-40 h-40 object-cover rounded-lg border shadow-md"
+                
+              />
+            ) : (
+              <div className="w-40 h-40 flex items-center justify-center bg-gray-200 rounded-lg border">
+                <span className="text-gray-500">Sin Foto</span>
+              </div>
+            )}
+            <div className="mt-4">
             <FotoInput
               foto={empleadoEditando.foto}
-              setFoto={(foto) => setEmpleadoEditando({ ...empleadoEditando, foto })}
+              setFoto={(nuevaFoto) =>
+                setEmpleadoEditando({
+                  ...empleadoEditando,
+                  foto: typeof nuevaFoto === "string" && nuevaFoto.trim() !== ""
+                        ? nuevaFoto
+                        : empleadoEditando.foto ?? null
+                })
+              }
+              showPreview={false}
             />
+            </div>
           </div>
-        </div>
-      )}
+          </div>
+        )}
 
+        
       {/* FILTROS */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <input
@@ -844,64 +973,91 @@ const importarExcel = async (file) => {
         </button>
       </div>
 
+    
       {/* TABLA */}
-      <div className="overflow-x-auto">
-        <table className="w-full border border-gray-300 text-left text-sm">
-          <thead>
-            <tr className="bg-gray-200">
-              <th className="p-2 border text-center">Nombre</th>
-              <th className="p-2 border text-center">DNI</th>
-              <th className="p-2 border text-center">Correo</th>
-              <th className="p-2 border text-center">Teléfono</th>
-              <th className="p-2 border text-center">Dirección</th>
-              <th className="p-2 border text-center">Estado</th>
-              <th className="p-2 border text-center">Clínica</th>
-              <th className="p-2 border text-center">Rol</th>
-              <th className="p-2 border text-center">Fecha ingreso</th>
-              <th className="p-2 border text-center">Fecha salida</th>
-              <th className="p-2 border text-center">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {empleadosActuales.map((emp) => (
-              <tr key={emp.id_empleado} className="hover:bg-blue-100">
-                <td className="p-2 border">{emp.nombre}</td>
-                <td className="p-2 border">{formatDNI(emp.DNI)}</td>
-                <td className="p-2 border">{emp.correo}</td>
-                <td className="p-2 border">{emp.telefono}</td>
-                <td className="p-2 border">{emp.direccion}</td>
-                <td className="p-2 border">{emp.estado}</td>
-                <td className="p-2 border">{emp.clinica}</td>
-                <td className="p-2 border">{emp.rol}</td>
-                <td className="p-2 border">{formatFecha(emp.fecha_ingreso)}</td>
-                <td className="p-2 border">{formatFecha(emp.fecha_salida)}</td>
-                <td className="p-2 border flex gap-2">
-                  <button
-                    onClick={() => seleccionarEmpleado(emp)}
-                    className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => eliminarEmpleado(emp.id_empleado)}
-                    className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
-                  >
-                    Eliminar
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {empleadosActuales.length === 0 && (
-              <tr>
-                <td colSpan={11} className="text-center p-4 text-gray-500">
-                  No se encontraron empleados.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      
+        
+
+<div className="w-full overflow-x-auto">
+  <table className="min-w-full border border-gray-300 text-left text-xs">
+    <thead>
+      <tr className="bg-gray-200">
+        <th className="px-1 py-1 border text-center">Nombre</th>
+        <th className="px-1 py-1 border text-center">DNI</th>
+        <th className="px-1 py-1 border text-center">Correo</th>
+        <th className="px-1 py-1 border text-center">Teléfono</th>
+        <th className="px-1 py-1 border text-center">Dirección</th>
+        <th className="px-1 py-1 border text-center">Estado</th>
+        <th className="px-1 py-1 border text-center">Clínica</th>
+        <th className="px-1 py-1 border text-center">Rol</th>
+        <th className="px-1 py-1 border text-center">Área</th>
+        <th className="px-1 py-1 border text-center">Puesto</th>
+        <th className="px-1 py-1 border text-center">Fecha ingreso</th>
+        <th className="px-1 py-1 border text-center">Fecha salida</th>
+        <th className="px-1 py-1 border text-center">Acciones</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {empleadosActuales.map((emp) => (
+        <tr key={emp.id_empleado} className="hover:bg-blue-50">
+          <td className="px-1 py-1 border max-w-[220px] whitespace-normal break-words">
+            {emp.nombre}
+          </td>
+
+          <td className="px-1 py-1 border">{formatDNI(emp.DNI)}</td>
+          <td className="px-1 py-1 border max-w-[160px] truncate" title={emp.correo}>
+            {emp.correo}
+          </td>
+
+          <td className="px-1 py-1 border">{emp.telefono}</td>
+          <td className="px-1 py-1 border max-w-[260px] clamp-2">
+            {emp.direccion}
+          </td>
+
+          <td className="px-1 py-1 border">{emp.estado}</td>
+          <td className="px-1 py-1 border max-w-[160px] whitespace-normal break-words">
+            {emp.clinica}
+          </td>
+
+          <td className="px-1 py-1 border">{emp.rol}</td>
+          <td className="px-1 py-1 border max-w-[160px] whitespace-normal break-words">
+            {emp.nombre_area ?? emp.area ?? "—"}
+          </td>
+          <td className="px-1 py-1 border max-w-[140px] truncate" title={emp.puesto ?? "—"}>
+            {emp.puesto ?? "—"}
+          </td>
+
+          <td className="px-1 py-1 border">{formatFecha(emp.fecha_ingreso)}</td>
+          <td className="px-1 py-1 border">{formatFecha(emp.fecha_salida)}</td>
+
+          <td className="px-1 py-1 border flex gap-1 whitespace-nowrap">
+            <button
+              onClick={() => seleccionarEmpleado(emp.id_empleado)}
+              className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
+            >
+              Editar
+            </button>
+            <button
+              onClick={() => eliminarEmpleado(emp.id_empleado)}
+              className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+            >
+              Eliminar
+            </button>
+          </td>
+        </tr>
+      ))}
+
+      {empleadosActuales.length === 0 && (
+        <tr>
+          <td colSpan={13} className="text-center p-4 text-gray-500">
+            No se encontraron empleados.
+          </td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+</div>
+
       {/* PAGINACION */}
       <Paginacion
         totalPaginas={totalPaginas}

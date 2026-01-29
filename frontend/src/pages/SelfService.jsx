@@ -57,6 +57,8 @@ function SelfService() {
         <p><strong>Teléfono:</strong> {mostrar(userData.telefono)}</p>
         <p><strong>Clínica:</strong> {mostrar(userData.clinica)}</p>
         <p><strong>Estado:</strong> {mostrar(userData.estado)}</p>
+        <p><strong>Área:</strong> {mostrar(userData.nombre_area)}</p>
+        <p><strong>Puesto:</strong> {mostrar(userData.puesto)}</p>
         <p>
           <strong>Fecha de ingreso:</strong>{" "}
           {userData.fecha_ingreso ? new Date(userData.fecha_ingreso).toLocaleDateString() : "No registrada"}

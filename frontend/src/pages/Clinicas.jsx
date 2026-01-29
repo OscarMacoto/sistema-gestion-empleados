@@ -4,7 +4,7 @@ function Clinicas() {
   const [clinicas, setClinicas] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [pagina, setPagina] = useState(1);
-  const porPagina = 6;
+  const porPagina = 10;
 
   const [nuevaClinica, setNuevaClinica] = useState({ nombre_clinica: "" });
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -13,12 +13,21 @@ function Clinicas() {
     cargarClinicas();
   }, []);
 
-  const cargarClinicas = () => {
-    fetch("http://localhost:5000/api/clinicas")
-      .then(res => res.json())
-      .then(data => setClinicas(data))
-      .catch(() => console.error("No se pudieron cargar las clínicas"));
-  };
+  useEffect(() => {
+    setPagina(1);
+  }, [busqueda])
+
+  
+const cargarClinicas = () => {
+  fetch("http://localhost:5000/api/clinicas")
+    .then(res => res.json())
+    .then(data => {
+      setClinicas(data);
+      setPagina(1);
+    })
+    .catch(() => console.error("No se pudieron cargar las clínicas"));
+};
+
 
   const handleChangeClinica = (e) => {
     setNuevaClinica({ ...nuevaClinica, [e.target.name]: e.target.value });

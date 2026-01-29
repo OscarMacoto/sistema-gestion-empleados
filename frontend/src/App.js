@@ -12,6 +12,9 @@ import SelfService from "./pages/SelfService";
 import LoginMicrosoft from "./components/LoginMicrosoft";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import { BrowserCacheLocation } from "@azure/msal-browser";
+
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -53,6 +56,8 @@ function AccesoDenegado() {
   );
 }
 
+
+
 const msalConfig = {
   auth: {
     clientId: "d317992c-f1f6-4ecf-8bb5-bc4ad085b979",
@@ -60,7 +65,12 @@ const msalConfig = {
       "https://login.microsoftonline.com/d7d9814e-2d7a-4cf4-b34d-b3ad99396e3f",
     redirectUri: window.location.origin,
   },
+  cache: {
+    cacheLocation: BrowserCacheLocation.LocalStorage,
+    storeAuthStateInCookie: true,
+  },
 };
+
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
@@ -141,6 +151,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SelfService />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute rolesPermitidos={["Administrador", "RRHH"]}>
+              <Dashboard />
             </ProtectedRoute>
           }
         />
