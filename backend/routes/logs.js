@@ -61,7 +61,7 @@ router.get("/", async (req, res, next) => {
     if (hasta) {
       totalReq.input("hasta", sql.DateTime2, parseHasta(hasta));
       dataReq.input("hasta", sql.DateTime2, parseHasta(hasta));
-      where += " AND fecha < @hasta"; // exclusivo (día siguiente)
+      where += " AND fecha < @hasta";
     }
 
     const totalSql = `

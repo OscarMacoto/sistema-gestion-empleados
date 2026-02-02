@@ -75,7 +75,6 @@ function AppContent() {
   const isAuthenticated = useIsAuthenticated();
   const [showWelcome, setShowWelcome] = useState(true);
 
-  // 👇 Usa el hook de logout
   const { handleLogout } = useLogout();
 
   useEffect(() => {
