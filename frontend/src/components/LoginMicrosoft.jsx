@@ -2,6 +2,32 @@ import { useMsal } from "@azure/msal-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLogout } from "../hooks/useLogout";
+import { API_BASE } from "../config/api";
+
+async function apiGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "GET",
+    headers: { "Accept": "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET ${path} → ${res.status} ${res.statusText} ${text}`);
+  }
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST ${path} → ${res.status} ${res.statusText} ${text}`);
+  }
+  return res.json().catch(() => ({}));
+}
 
 function LoginMicrosoft() {
   const { instance, accounts } = useMsal();
@@ -13,13 +39,9 @@ function LoginMicrosoft() {
       if (accounts.length > 0) {
         try {
           instance.setActiveAccount(accounts[0]);
-
           const email = accounts[0].username;
 
-          const rolResponse = await fetch(
-            `http://localhost:5000/api/empleados/rol/${email}`
-          );
-          const rolData = await rolResponse.json();
+          const rolData = await apiGet(`/empleados/rol/${encodeURIComponent(email)}`);
           const rol = rolData?.descripcion || "Empleado";
 
           localStorage.setItem("usuario_rol", rol);
@@ -51,28 +73,19 @@ function LoginMicrosoft() {
       const email = account.username;
       const nombreCompleto = account.name;
 
-      const empleadoRes = await fetch(
-        `http://localhost:5000/api/empleados/email/${email}`
-      );
-      const empleadoData = await empleadoRes.json();
+      const empleadoData = await apiGet(`/empleados/email/${encodeURIComponent(email)}`);
 
-      const rolRes = await fetch(
-        `http://localhost:5000/api/empleados/rol/${email}`
-      );
-      const rolData = await rolRes.json();
-
+      const rolData = await apiGet(`/empleados/rol/${encodeURIComponent(email)}`);
       const rol = rolData?.descripcion || "Empleado";
-      localStorage.setItem("usuario_rol", rolData?.descripcion || "Empleado");
+
+      localStorage.setItem("usuario_rol", rol);
       window.dispatchEvent(new Event("role-updated"));
 
       localStorage.setItem("usuario_email", email);
       localStorage.setItem("usuario_nombre", nombreCompleto);
-      localStorage.setItem("usuario_rol", rol);
 
-      await fetch("http://localhost:5000/api/auth/actualizar-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_empleado: empleadoData.id_empleado }),
+      await apiPost("/auth/actualizar-login", {
+        id_empleado: empleadoData.id_empleado,
       });
 
       if (rol === "Empleado de planta") {

@@ -1,24 +1,38 @@
 import sql from "mssql";
 
+function toInt(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeMssqlError(error) {
+  return {
+    message: error?.message,
+    code: error?.code,
+    number: error?.number,
+    name: error?.name,
+  };
+}
+
 const dbConfig = {
   user: process.env.DB_USER || "appuser",
   password: process.env.DB_PASSWORD || "12345",
   server: process.env.DB_SERVER || "localhost",
-  port: Number(process.env.DB_PORT || 1433),
+  port: toInt(process.env.DB_PORT, 1433),
   database: process.env.DB_NAME || "RRHH",
   options: {
-    encrypt: process.env.DB_ENCRYPT ? process.env.DB_ENCRYPT === "true" : false,
-    trustServerCertificate:
-      process.env.DB_TRUST_CERT ? process.env.DB_TRUST_CERT === "true" : true,
+    encrypt: process.env.DB_ENCRYPT ? process.env.DB_ENCRYPT === "true" : true,
+    trustServerCertificate: process.env.DB_TRUST_CERT ? process.env.DB_TRUST_CERT === "true" : false,
     enableArithAbort: true,
+    appName: process.env.APP_NAME || "sistema-gestion-empleados",
   },
   pool: {
-    max: Number(process.env.DB_POOL_MAX || 20),
-    min: Number(process.env.DB_POOL_MIN || 5),
-    idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT || 60000),
+    max: toInt(process.env.DB_POOL_MAX, 20),
+    min: toInt(process.env.DB_POOL_MIN, 5),
+    idleTimeoutMillis: toInt(process.env.DB_IDLE_TIMEOUT, 60000),
   },
-  connectionTimeout: Number(process.env.DB_CONN_TIMEOUT || 30000),
-  requestTimeout: Number(process.env.DB_REQ_TIMEOUT || 60000),
+  connectionTimeout: toInt(process.env.DB_CONN_TIMEOUT, 30000),
+  requestTimeout: toInt(process.env.DB_REQ_TIMEOUT, 60000),
 };
 
 let pool = null;
@@ -34,11 +48,7 @@ async function connectWithRetry(retries = 3, baseDelayMs = 500) {
     try {
       const _pool = new sql.ConnectionPool(dbConfig);
       _pool.on("error", (err) => {
-        console.error("[DB] Error en el pool SQL:", {
-          message: err?.message,
-          code: err?.code,
-          number: err?.number,
-        });
+        console.error("[DB] Error en el pool SQL:", normalizeMssqlError(err));
         pool = null;
       });
 
@@ -52,9 +62,7 @@ async function connectWithRetry(retries = 3, baseDelayMs = 500) {
       console.error("[DB] Error conectando a SQL Server:", {
         attempt,
         retries,
-        message: error?.message,
-        code: error?.code,
-        number: error?.number,
+        ...normalizeMssqlError(error),
       });
 
       if (isLast) {
@@ -65,7 +73,8 @@ async function connectWithRetry(retries = 3, baseDelayMs = 500) {
       }
 
       const delay = baseDelayMs * Math.pow(2, attempt - 1);
-      await new Promise((r) => setTimeout(r, delay));
+      const jitter = Math.floor(Math.random() * 0.25 * delay);
+      await new Promise((r) => setTimeout(r, delay + jitter));
     }
   }
 }
@@ -81,8 +90,8 @@ export async function connectDB() {
     }
 
     connectingPromise = connectWithRetry(
-      Number(process.env.DB_CONN_RETRIES || 3),
-      Number(process.env.DB_CONN_BASE_DELAY || 500)
+      toInt(process.env.DB_CONN_RETRIES, 3),
+      toInt(process.env.DB_CONN_BASE_DELAY, 500)
     );
 
     pool = await connectingPromise;

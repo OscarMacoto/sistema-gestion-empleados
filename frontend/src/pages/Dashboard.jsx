@@ -1,8 +1,21 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { API_BASE } from "../config/api";
 
-const API = "http://localhost:5000/api";
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: { Accept: "application/json" },
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err?.response?.status;
+    const data = err?.response?.data;
+    console.error("API Error:", status, data || err.message);
+    return Promise.reject(err);
+  }
+);
 
 const CONFIG_ESTADOS = {
   ACTIVO_ID_FIJO: 1,
@@ -16,7 +29,14 @@ const StatCard = ({ title, value, loading, color = "bg-blue-600" }) => (
   </div>
 );
 
-const Select = ({ label, value, onChange, options, placeholder = "Seleccione...", className = "" }) => (
+const Select = ({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = "Seleccione...",
+  className = "",
+}) => (
   <div className={`flex flex-col ${className}`}>
     <label className="text-xs text-gray-600 mb-1">{label}</label>
     <select
@@ -56,7 +76,9 @@ export default function Dashboard() {
       };
     }
     const byDesc = (d) =>
-      estados.find((e) => (e.descripcion || "").toLowerCase() === d.toLowerCase());
+      estados.find(
+        (e) => (e.descripcion || "").toLowerCase() === d.toLowerCase()
+      );
     const byIncludes = (arr) =>
       estados.find((e) => {
         const d = (e.descripcion || "").toLowerCase();
@@ -77,19 +99,25 @@ export default function Dashboard() {
     const loadLists = async () => {
       try {
         const [areasRes, clinicasRes, estadosRes] = await Promise.all([
-          axios.get(`${API}/empleados/areas/lista`),
-          axios.get(`${API}/empleados/clinicas/lista`),
-          axios.get(`${API}/empleados/estados/lista`),
+          api.get("/empleados/areas/lista"),
+          api.get("/empleados/clinicas/lista"),
+          api.get("/empleados/estados/lista"),
         ]);
 
-        setAreas((areasRes.data?.data || []).map((a) => ({
-          value: a.id_area, label: a.nombre_area,
-        })));
+        setAreas(
+          (areasRes.data?.data || []).map((a) => ({
+            value: a.id_area,
+            label: a.nombre_area,
+          }))
+        );
 
         const clinicasData = clinicasRes.data?.data || [];
-        setClinicas(clinicasData.map((c) => ({
-          value: c.id_clinica, label: c.nombre_clinica,
-        })));
+        setClinicas(
+          clinicasData.map((c) => ({
+            value: c.id_clinica,
+            label: c.nombre_clinica,
+          }))
+        );
 
         setEstados(estadosRes.data?.data || []);
       } catch (e) {
@@ -105,7 +133,7 @@ export default function Dashboard() {
     if (clinica) params.clinica = Number(clinica);
     if (area) params.area = Number(area);
 
-    const res = await axios.get(`${API}/empleados`, { params });
+    const res = await api.get("/empleados", { params });
     return res.data?.pagination?.total ?? 0;
   };
 
@@ -166,11 +194,19 @@ export default function Dashboard() {
           placeholder="Todas las clínicas"
         />
         <div className="flex items-end gap-2">
-          <button onClick={loadMetrics} className="px-3 py-2 bg-gray-800 text-white rounded">
+          <button
+            type="button"
+            onClick={loadMetrics}
+            className="px-3 py-2 bg-gray-800 text-white rounded"
+          >
             Aplicar filtros
           </button>
           <button
-            onClick={() => { setAreaId(""); setClinicaId(""); }}
+            type="button"
+            onClick={() => {
+              setAreaId("");
+              setClinicaId("");
+            }}
             className="px-3 py-2 bg-gray-200 rounded"
           >
             Limpiar
@@ -179,9 +215,24 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <StatCard title="Usuarios Activos" value={activos} loading={loading} color="bg-emerald-600" />
-        <StatCard title="Usuarios On Leave" value={onLeave} loading={loading} color="bg-amber-600" />
-        <StatCard title="Clínicas" value={clinicasCount} loading={loading} color="bg-indigo-600" />
+        <StatCard
+          title="Usuarios Activos"
+          value={activos}
+          loading={loading}
+          color="bg-emerald-600"
+        />
+        <StatCard
+          title="Usuarios On Leave"
+          value={onLeave}
+          loading={loading}
+          color="bg-amber-600"
+        />
+        <StatCard
+          title="Clínicas"
+          value={clinicasCount}
+          loading={loading}
+          color="bg-indigo-600"
+        />
       </div>
     </div>
   );

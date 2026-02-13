@@ -1,6 +1,12 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import axios from "axios";
 import { useMsal } from "@azure/msal-react";
+import { API_BASE } from "../config/api";
+
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: { Accept: "application/json" },
+});
 
 const SelectInput = ({
   name,
@@ -20,7 +26,7 @@ const SelectInput = ({
     opt.id_estado ?? opt.id_clinica ?? opt.id_rol ?? opt.id_area;
 
   const getLabel = (opt) =>
-    opt.descripcion ?? opt.nombre_clinica ?? opt.nombre_rol ?? opt.nombre_area;;
+    opt.descripcion ?? opt.nombre_clinica ?? opt.nombre_rol ?? opt.nombre_area;
 
   return (
     <select
@@ -33,11 +39,9 @@ const SelectInput = ({
       }`}
     >
       <option value="">{placeholder}</option>
-
       {safeOptions.map((opt) => {
         const id = getId(opt);
         if (id == null) return null;
-
         return (
           <option key={id} value={id}>
             {getLabel(opt)}
@@ -56,12 +60,10 @@ const FotoInput = ({ foto, setFoto, showPreview = true }) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64 = reader.result.split(",")[1];
-
       if (base64 && typeof base64 === "string") {
         setFoto(base64);
       }
     };
-
     reader.readAsDataURL(file);
   };
 
@@ -73,7 +75,6 @@ const FotoInput = ({ foto, setFoto, showPreview = true }) => {
         onChange={handleChange}
         className="p-2 border rounded text-sm"
       />
-
       {showPreview && foto && (
         <img
           src={`data:image/jpeg;base64,${foto}`}
@@ -85,8 +86,7 @@ const FotoInput = ({ foto, setFoto, showPreview = true }) => {
   );
 };
 
-
-//Formato al DNI
+// Formato al DNI
 const formatDNI = (value) => {
   if (!value) return "";
   const digits = String(value).replace(/\D/g, "").slice(0, 13);
@@ -96,16 +96,18 @@ const formatDNI = (value) => {
   return [parte1, parte2, parte3].filter(Boolean).join("-");
 };
 
-
 const Empleado = () => {
   const { accounts } = useMsal();
+
   const [empleados, setEmpleados] = useState([]);
   const [paginaActual, setPaginaActual] = useState(1);
   const empleadosPorPagina = 10;
   const [totalPaginas, setTotalPaginas] = useState(1);
+
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroClinica, setFiltroClinica] = useState("");
+
   const [nuevoEmpleado, setNuevoEmpleado] = useState({
     nombre: "",
     DNI: "",
@@ -119,106 +121,101 @@ const Empleado = () => {
     puesto: "",
     foto: null,
   });
+
   const [empleadoEditando, setEmpleadoEditando] = useState(null);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+
   const [estados, setEstados] = useState([]);
   const [clinicas, setClinicas] = useState([]);
   const [roles, setRoles] = useState([]);
   const [areas, setAreas] = useState([]);
+
   const [usuarioActivo, setUsuarioActivo] = useState({ nombre: "", correo: "" });
   const inputFileRef = useRef(null);
+
   const [cargandoImport, setCargandoImport] = useState(false);
   const [cargandoExport, setCargandoExport] = useState(false);
 
-
-  
-const seleccionarEmpleado = async (id) => {
-  try {
-    const res = await axios.get(`http://localhost:5000/api/empleados/${id}`);
-    const emp = res.data;
-
-    console.log("EMP GET ID:", emp);
-
-    setEmpleadoEditando({
-      ...emp,
-      id_estado: emp.id_estado ?? "",
-      id_clinica: emp.id_clinica ?? "",
-      id_rol: emp.id_rol ?? "",
-      id_area: emp.id_area ?? "",
-      foto:
-        typeof emp.foto === "string" &&
-        emp.foto.trim() !== ""
-          ? emp.foto
-          : null
-    });
-
-  } catch (err) {
-    console.error("ERROR GET EMPLEADO ID:", err.response?.data || err);
-    alert("No se pudo cargar la información del empleado.");
-  }
-};
-
-
-  
-const obtenerEmpleados = useCallback(async () => {
-  if (!usuarioActivo.correo) return;
-
-  try {
-    const res = await axios.get("http://localhost:5000/api/empleados", {
-      params: {
-        usuario_email: usuarioActivo.correo,
-        page: paginaActual,
-        limit: empleadosPorPagina,
-        nombre: filtroNombre,
-        estado: filtroEstado,
-        clinica: filtroClinica,
-      },
-    });
-
-    console.log("API empleados:", res.data);
-
-    setEmpleados(res.data?.data ?? []);
-    setTotalPaginas(res.data?.pagination?.totalPages ?? 1);
-
-  } catch (error) {
-    console.error("Error al obtener empleados:", error);
-    setEmpleados([]);
-    setTotalPaginas(1);
-  }
-}, [
-  usuarioActivo.correo,
-  paginaActual,
-  filtroNombre,
-  filtroEstado,
-  filtroClinica
-]);
-
-  // GET USUARIO ACTIVO
   useEffect(() => {
     if (accounts.length > 0) {
-      setUsuarioActivo({ nombre: accounts[0].name, correo: accounts[0].username });
+      setUsuarioActivo({
+        nombre: accounts[0].name,
+        correo: accounts[0].username,
+      });
     }
   }, [accounts]);
 
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [filtroNombre, filtroEstado, filtroClinica]);
 
-  // GET LISTAS
-useEffect(() => {
-  setPaginaActual(1);
-}, [filtroNombre, filtroEstado, filtroClinica]);
 
-const obtenerEstados = async () => {
+  const seleccionarEmpleado = async (id) => {
     try {
-      const res = await axios.get("http://localhost:5000/api/empleados/estados/lista");
-      setEstados(res.data.data);
+      const res = await api.get(`/empleados/${id}`);
+      const emp = res.data;
+
+      setEmpleadoEditando({
+        ...emp,
+        id_estado: emp.id_estado ?? "",
+        id_clinica: emp.id_clinica ?? "",
+        id_rol: emp.id_rol ?? "",
+        id_area: emp.id_area ?? "",
+        foto:
+          typeof emp.foto === "string" && emp.foto.trim() !== ""
+            ? emp.foto
+            : null,
+      });
+    } catch (err) {
+      console.error("ERROR GET EMPLEADO ID:", err.response?.data || err);
+      alert("No se pudo cargar la información del empleado.");
+    }
+  };
+
+  const obtenerEmpleados = useCallback(async () => {
+    if (!usuarioActivo.correo) return;
+
+    try {
+      const res = await api.get("/empleados", {
+        params: {
+          usuario_email: usuarioActivo.correo,
+          page: paginaActual,
+          limit: empleadosPorPagina,
+          nombre: filtroNombre,
+          estado: filtroEstado,
+          clinica: filtroClinica,
+        },
+      });
+
+      setEmpleados(res.data?.data ?? []);
+      setTotalPaginas(res.data?.pagination?.totalPages ?? 1);
+    } catch (error) {
+      console.error("Error al obtener empleados:", error);
+      setEmpleados([]);
+      setTotalPaginas(1);
+    }
+  }, [
+    usuarioActivo.correo,
+    paginaActual,
+    empleadosPorPagina,
+    filtroNombre,
+    filtroEstado,
+    filtroClinica,
+  ]);
+
+  const obtenerEstados = async () => {
+    try {
+      const res = await api.get("/empleados/estados/lista");
+      setEstados(res.data?.data ?? []);
     } catch (error) {
       console.error("Error al obtener estados:", error);
     }
-};
+  };
 
   const obtenerClinicas = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/empleados/clinicas/lista");
-      setClinicas(res.data.data);
+      const res = await api.get("/empleados/clinicas/lista");
+      setClinicas(res.data?.data ?? []);
     } catch (error) {
       console.error("Error al obtener clínicas:", error);
     }
@@ -226,23 +223,21 @@ const obtenerEstados = async () => {
 
   const obtenerRoles = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/empleados/roles/lista");
-      setRoles(res.data.data);
+      const res = await api.get("/empleados/roles/lista");
+      setRoles(res.data?.data ?? []);
     } catch (error) {
       console.error("Error al obtener roles:", error);
     }
   };
 
-  
-    const obtenerAreas = async () => {
-      try {
-        const res = await axios.get("http://localhost:5000/api/empleados/areas/lista");
-        setAreas(res.data.data);
-      } catch (error) {
-        console.error("Error al obtener áreas:", error);
-      }
-    };
-
+  const obtenerAreas = async () => {
+    try {
+      const res = await api.get("/empleados/areas/lista");
+      setAreas(res.data?.data ?? []);
+    } catch (error) {
+      console.error("Error al obtener áreas:", error);
+    }
+  };
 
   useEffect(() => {
     obtenerEmpleados();
@@ -253,215 +248,195 @@ const obtenerEstados = async () => {
   }, [obtenerEmpleados]);
 
   const empleadosActuales = empleados;
-  
+
   const formatFecha = (fecha) => {
-  if (!fecha) return "";
+    if (!fecha) return "";
+    const parts = fecha.split("-");
+    if (parts.length < 3) return "";
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const d = new Date(year, month, day);
+    return d.toLocaleDateString("es-HN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
 
-  const parts = fecha.split("-"); 
-  if (parts.length < 3) return "";
+  const resetNuevoEmpleado = () => {
+    setNuevoEmpleado({
+      nombre: "",
+      DNI: "",
+      correo: "",
+      telefono: "",
+      direccion: "",
+      id_estado: "",
+      id_clinica: "",
+      id_rol: "",
+      foto: null,
+    });
+  };
 
-  const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10) - 1;
-  const day = parseInt(parts[2], 10);
+  const handleChangeNuevo = (e) => {
+    let { name, value } = e.target;
+    const camposNumericos = ["id_estado", "id_clinica", "id_rol", "id_area"];
 
-  const d = new Date(year, month, day); 
-  return d.toLocaleDateString("es-HN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-};
+    if (name === "id_area" && value === "") {
+      value = null;
+    }
+    if (camposNumericos.includes(name) && value !== "" && value !== null) {
+      value = Number(value);
+    }
+    if (name === "DNI" || name === "telefono") {
+      value = value.replace(/\D/g, "");
+    }
 
-const resetNuevoEmpleado = () => {
-  setNuevoEmpleado({
-    nombre: "",
-    DNI: "",
-    correo: "",
-    telefono: "",
-    direccion: "",
-    id_estado: "",
-    id_clinica: "",
-    id_rol: "",
-    foto: null,
-  });
-};
+    setNuevoEmpleado((prev) => ({ ...prev, [name]: value }));
+  };
 
+  const agregarEmpleado = async () => {
+    if (
+      !nuevoEmpleado.nombre ||
+      !nuevoEmpleado.DNI ||
+      !nuevoEmpleado.correo ||
+      !nuevoEmpleado.id_estado ||
+      !nuevoEmpleado.id_clinica
+    ) {
+      return alert("Por favor completa todos los campos obligatorios.");
+    }
 
-
-// ADD (POST) EMPLEADO
-
-const handleChangeNuevo = (e) => {
-  let { name, value } = e.target;
-  const camposNumericos = ["id_estado", "id_clinica", "id_rol", "id_area"];
-  if (name === "id_area" && value === "") {
-    value = null;
-  }
-  if (camposNumericos.includes(name) && value !== "" && value !== null) {
-    value = Number(value);
-  }
-  if (name === "DNI" || name === "telefono") {
-    value = value.replace(/\D/g, "");
-  }
-  setNuevoEmpleado((prev) => ({
-    ...prev,
-    [name]: value,
-  }));
-};
-
-
-
-const agregarEmpleado = async () => {
-  if (
-    !nuevoEmpleado.nombre ||
-    !nuevoEmpleado.DNI ||
-    !nuevoEmpleado.correo ||
-    !nuevoEmpleado.id_estado ||
-    !nuevoEmpleado.id_clinica
-  )
-    return alert("Por favor completa todos los campos obligatorios.");
-
-  const telefonoNormalizado = nuevoEmpleado.telefono.replace(/-/g, "");
-  const estadoSeleccionado = estados.find(
-    (e) => e.id_estado === nuevoEmpleado.id_estado
-  );
-  const fechaSalida =
-    ["Despedido", "Renuncia"].includes(estadoSeleccionado?.descripcion)
+    const telefonoNormalizado = (nuevoEmpleado.telefono || "").replace(/-/g, "");
+    const estadoSeleccionado = estados.find(
+      (e) => e.id_estado === nuevoEmpleado.id_estado
+    );
+    const fechaSalida = ["Despedido", "Renuncia"].includes(
+      estadoSeleccionado?.descripcion
+    )
       ? new Date()
       : null;
 
-  
-  const empleadoAGuardar = {
-    ...nuevoEmpleado,
-    telefono: telefonoNormalizado,
-    id_estado: Number(nuevoEmpleado.id_estado),
-    id_clinica: Number(nuevoEmpleado.id_clinica),
-    id_rol:
-      Number(nuevoEmpleado.id_rol) ||
-      roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
-      3,
-    id_area : Number(nuevoEmpleado.id_area),
-    puesto: nuevoEmpleado.puesto,
-    usuario_email: usuarioActivo.correo,
-    fecha_salida: fechaSalida,
+    const empleadoAGuardar = {
+      ...nuevoEmpleado,
+      telefono: telefonoNormalizado,
+      id_estado: Number(nuevoEmpleado.id_estado),
+      id_clinica: Number(nuevoEmpleado.id_clinica),
+      id_rol:
+        Number(nuevoEmpleado.id_rol) ||
+        roles.find((r) => r.nombre_rol === "Empleado de planta")?.id_rol ||
+        3,
+      id_area: Number(nuevoEmpleado.id_area),
+      puesto: nuevoEmpleado.puesto,
+      usuario_email: usuarioActivo.correo,
+      fecha_salida: fechaSalida,
+    };
+
+    try {
+      await api.post("/empleados", empleadoAGuardar);
+      alert("Empleado agregado correctamente.");
+      resetNuevoEmpleado();
+      setMostrarFormulario(false);
+      obtenerEmpleados();
+    } catch (error) {
+      console.error("Error al agregar empleado:", error);
+      alert(error.response?.data?.error || "Error al agregar empleado.");
+    }
   };
 
 
-  try {
-    await axios.post("http://localhost:5000/api/empleados", empleadoAGuardar);
-    alert("Empleado agregado correctamente.");
-    resetNuevoEmpleado();
-    setMostrarFormulario(false);
-    obtenerEmpleados();
-  } catch (error) {
-    console.error("Error al agregar empleado:", error);
-    alert(error.response?.data?.error || "Error al agregar empleado.");
-  }
-};
-//  VALIDADORES 
+  const validarEmpleadoEditado = () => {
+    if (
+      !empleadoEditando.id_estado ||
+      !empleadoEditando.id_clinica ||
+      !empleadoEditando.id_rol ||
+      !empleadoEditando.id_area ||
+      !empleadoEditando.puesto?.trim() ||
+      !empleadoEditando.telefono?.trim() ||
+      !empleadoEditando.direccion?.trim()
+    ) {
+      alert("Todos los campos son obligatorios.");
+      return false;
+    }
+    if (
+      empleadoEditando.telefono.length < 8 ||
+      empleadoEditando.telefono.length > 8
+    ) {
+      alert("El teléfono debe tener 8 dígitos.");
+      return false;
+    }
+    return true;
+  };
 
-  
-const validarEmpleadoEditado = () => {
-  if (
-    !empleadoEditando.id_estado ||
-    !empleadoEditando.id_clinica ||
-    !empleadoEditando.id_rol ||
-    !empleadoEditando.id_area ||
-    !empleadoEditando.puesto?.trim() ||
-    !empleadoEditando.telefono?.trim() ||
-    !empleadoEditando.direccion?.trim()
-  ) {
-    alert("Todos los campos son obligatorios.");
-    return false;
-  }
+  const validarNuevoEmpleado = () => {
+    const {
+      nombre,
+      DNI,
+      correo,
+      telefono,
+      direccion,
+      id_estado,
+      id_clinica,
+      id_area,
+      puesto,
+    } = nuevoEmpleado;
 
-  if (empleadoEditando.telefono.length < 8 || empleadoEditando.telefono.length > 8) {
-    alert("El teléfono debe tener 8 dígitos.");
-    return false;
-  }
+    if (
+      !nombre.trim() ||
+      !DNI.trim() ||
+      !correo.trim() ||
+      !telefono.trim() ||
+      !direccion.trim() ||
+      !id_estado ||
+      !id_clinica ||
+      !id_area ||
+      !puesto?.trim()
+    ) {
+      alert("Todos los campos son obligatorios.");
+      return false;
+    }
 
-  return true;
-};
+    if (!/^\d+$/.test(DNI)) {
+      alert("El DNI solo debe contener números.");
+      return false;
+    }
+    if (DNI.length < 13) {
+      alert("El DNI no es válido.");
+      return false;
+    }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(correo)) {
+      alert("El correo electrónico no tiene un formato válido.");
+      return false;
+    }
 
+    if (!/^\d+$/.test(telefono)) {
+      alert("El teléfono solo debe contener números.");
+      return false;
+    }
+    if (telefono.length < 8 || telefono.length > 8) {
+      alert("El teléfono debe tener 8 dígitos.");
+      return false;
+    }
 
-const validarNuevoEmpleado = () => {
-  const {
-    nombre,
-    DNI,
-    correo,
-    telefono,
-    direccion,
-    id_estado,
-    id_clinica,
-    id_area,
-    puesto  
-  } = nuevoEmpleado;
+    return true;
+  };
 
-  if (
-    !nombre.trim() ||
-    !DNI.trim() ||
-    !correo.trim() ||
-    !telefono.trim() ||
-    !direccion.trim() ||
-    !id_estado ||
-    !id_clinica ||
-    !id_area ||
-    !puesto?.trim()
-  ) {
-    alert("Todos los campos son obligatorios.");
-    return false;
-  }
-
-
-  if (!/^\d+$/.test(DNI)) {
-    alert("El DNI solo debe contener números.");
-    return false;
-  }
-
-  if (DNI.length < 13) {
-    alert("El DNI no es válido.");
-    return false;
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(correo)) {
-    alert("El correo electrónico no tiene un formato válido.");
-    return false;
-  }
-
-  if (!/^\d+$/.test(telefono)) {
-    alert("El teléfono solo debe contener números.");
-    return false;
-  }
-
-  if (telefono.length < 8 || telefono.length > 8) {
-    alert("El teléfono debe tener 8 dígitos.");
-    return false;
-  }
-
-  return true;
-};
-
-  // ACTUALIZAR EMPLEADO
   const actualizarEmpleado = async () => {
     if (!empleadoEditando.id_estado || !empleadoEditando.id_clinica) {
       return alert("Debes seleccionar Estado y Clínica.");
     }
-
     try {
-      await axios.put(
-        `http://localhost:5000/api/empleados/${empleadoEditando.id_empleado}`,
-        {
-          id_estado: Number(empleadoEditando.id_estado),
-          id_clinica: Number(empleadoEditando.id_clinica),
-          id_rol: Number(empleadoEditando.id_rol),
-          id_area: Number(empleadoEditando.id_area),
-          telefono: empleadoEditando.telefono,
-          direccion: empleadoEditando.direccion,
-          usuario_email: usuarioActivo.correo,
-          foto: empleadoEditando.foto,
-        }
-      );
+      await api.put(`/empleados/${empleadoEditando.id_empleado}`, {
+        id_estado: Number(empleadoEditando.id_estado),
+        id_clinica: Number(empleadoEditando.id_clinica),
+        id_rol: Number(empleadoEditando.id_rol),
+        id_area: Number(empleadoEditando.id_area),
+        telefono: empleadoEditando.telefono,
+        direccion: empleadoEditando.direccion,
+        usuario_email: usuarioActivo.correo,
+        foto: empleadoEditando.foto,
+      });
 
       alert("Empleado actualizado correctamente.");
       setEmpleadoEditando(null);
@@ -472,161 +447,148 @@ const validarNuevoEmpleado = () => {
     }
   };
 
-
-  // ELIMINAR EMPLEADO
-
-const eliminarEmpleado = async (id) => {
-  if (!window.confirm("¿Seguro que deseas eliminar este empleado?")) return;
-
-  try {
-    await axios.delete(`http://localhost:5000/api/empleados/${id}`, {
-      data: {
-        usuario_email: usuarioActivo.correo || "Sistema",
-      },
-    });
-
-    alert("Empleado eliminado correctamente.");
-    obtenerEmpleados();
-  } catch (error) {
-    console.error("Error al eliminar empleado:", error);
-    alert(error.response?.data?.error || "Error al eliminar empleado.");
-  }
-};
-
-  // EXPORTAR / IMPORTAR 
-const exportarExcel = async () => {
-  if (cargandoExport) return;
-  setCargandoExport(true);
-  try {
-    const res = await axios.get("http://localhost:5000/api/empleados/exportar", {
-      params: {
-        usuario_email: usuarioActivo.correo,
-        nombre: filtroNombre,
-        estado: filtroEstado,
-        clinica: filtroClinica,
-      },
-      responseType: "blob",
-    });
-
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "empleados.xlsx");
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  } catch (error) {
-    console.error("Error al exportar Excel:", error);
-    alert("No se pudo exportar el Excel.");
-  } finally {
-    setCargandoExport(false);
-  }
-};
-
-//Importar Excel
-
-
-const importarExcel = async (file) => {
-  if (cargandoImport) return;
-  if (!file) return alert("Selecciona un archivo primero.");
-
-  setCargandoImport(true);
-
-  try {
-    const formData = new FormData();
-    formData.append("archivo", file);
-    formData.append("usuario_email", usuarioActivo.correo);
-
-    const res = await axios.post(
-      "http://localhost:5000/api/empleados/importar",
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
-
-    if (res.data.success) {
-      alert("Empleados importados correctamente.");
-      await obtenerEmpleados();
-    } else {
-      alert("La importación terminó con advertencias.");
+ 
+  const eliminarEmpleado = async (id) => {
+    if (!window.confirm("¿Seguro que deseas eliminar este empleado?")) return;
+    try {
+      await api.delete(`/empleados/${id}`, {
+        data: { usuario_email: usuarioActivo.correo || "Sistema" },
+      });
+      alert("Empleado eliminado correctamente.");
+      obtenerEmpleados();
+    } catch (error) {
+      console.error("Error al eliminar empleado:", error);
+      alert(error.response?.data?.error || "Error al eliminar empleado.");
     }
+  };
 
-  } catch (error) {
-    console.error("Error al importar Excel:", error);
-    alert("No se pudo importar el archivo. Verifica el formato del Excel.");
-  } finally {
-    setCargandoImport(false);
-  }
-};
+  const exportarExcel = async () => {
+    if (cargandoExport) return;
+    setCargandoExport(true);
+    try {
+      const res = await api.get("/empleados/exportar", {
+        params: {
+          usuario_email: usuarioActivo.correo,
+          nombre: filtroNombre,
+          estado: filtroEstado,
+          clinica: filtroClinica,
+        },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "empleados.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Error al exportar Excel:", error);
+      alert("No se pudo exportar el Excel.");
+    } finally {
+      setCargandoExport(false);
+    }
+  };
+
+  const importarExcel = async (file) => {
+    if (cargandoImport) return;
+    if (!file) return alert("Selecciona un archivo primero.");
+
+    setCargandoImport(true);
+    try {
+      const formData = new FormData();
+      formData.append("archivo", file);
+      formData.append("usuario_email", usuarioActivo.correo);
+
+      const res = await api.post("/empleados/importar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data?.success) {
+        alert("Empleados importados correctamente.");
+        await obtenerEmpleados();
+      } else {
+        alert("La importación terminó con advertencias.");
+      }
+    } catch (error) {
+      console.error("Error al importar Excel:", error);
+      alert("No se pudo importar el archivo. Verifica el formato del Excel.");
+    } finally {
+      setCargandoImport(false);
+    }
+  };
 
 
   const Paginacion = ({ totalPaginas, paginaActual, setPaginaActual }) => {
-  const maxBotones = 7;
-  const getRangoPaginas = () => {
-    let start = Math.max(1, paginaActual - Math.floor(maxBotones / 2));
-    let end = start + maxBotones - 1;
+    const maxBotones = 7;
+    const getRangoPaginas = () => {
+      let start = Math.max(1, paginaActual - Math.floor(maxBotones / 2));
+      let end = start + maxBotones - 1;
 
-    if (end > totalPaginas) {
-      end = totalPaginas;
-      start = Math.max(1, end - maxBotones + 1);
-    }
+      if (end > totalPaginas) {
+        end = totalPaginas;
+        start = Math.max(1, end - maxBotones + 1);
+      }
 
-    const paginas = [];
-    for (let i = start; i <= end; i++) paginas.push(i);
-    return paginas;
+      const paginas = [];
+      for (let i = start; i <= end; i++) paginas.push(i);
+      return paginas;
+    };
+
+    const paginas = getRangoPaginas();
+    return (
+      <div className="flex justify-center mt-4 gap-2 flex-wrap">
+        <button
+          onClick={() => setPaginaActual(1)}
+          disabled={paginaActual === 1}
+          className="px-3 py-1 rounded bg-gray-200"
+        >
+          {"<<"}
+        </button>
+        <button
+          onClick={() => setPaginaActual(paginaActual - 1)}
+          disabled={paginaActual === 1}
+          className="px-3 py-1 rounded bg-gray-200"
+        >
+          {"<"}
+        </button>
+
+        {paginas[0] > 1 && <span className="px-2">...</span>}
+        {paginas.map((num) => (
+          <button
+            key={num}
+            className={`px-3 py-1 rounded ${
+              num === paginaActual ? "bg-blue-600 text-white" : "bg-gray-200"
+            }`}
+            onClick={() => setPaginaActual(num)}
+          >
+            {num}
+          </button>
+        ))}
+
+        {paginas[paginas.length - 1] < totalPaginas && (
+          <span className="px-2">...</span>
+        )}
+        <button
+          onClick={() => setPaginaActual(paginaActual + 1)}
+          disabled={paginaActual === totalPaginas}
+          className="px-3 py-1 rounded bg-gray-200"
+        >
+          {">"}
+        </button>
+        <button
+          onClick={() => setPaginaActual(totalPaginas)}
+          disabled={paginaActual === totalPaginas}
+          className="px-3 py-1 rounded bg-gray-200"
+        >
+          {">>"}
+        </button>
+      </div>
+    );
   };
 
-  const paginas = getRangoPaginas();
-  return (
-    <div className="flex justify-center mt-4 gap-2 flex-wrap">
-      <button
-        onClick={() => setPaginaActual(1)}
-        disabled={paginaActual === 1}
-        className="px-3 py-1 rounded bg-gray-200"
-      >
-        {"<<"}
-      </button>
-      <button
-        onClick={() => setPaginaActual(paginaActual - 1)}
-        disabled={paginaActual === 1}
-        className="px-3 py-1 rounded bg-gray-200"
-      >
-        {"<"}
-      </button>
-
-      {paginas[0] > 1 && <span className="px-2">...</span>}
-      {paginas.map((num) => (
-        <button
-          key={num}
-          className={`px-3 py-1 rounded ${
-            num === paginaActual ? "bg-blue-600 text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setPaginaActual(num)}
-        >
-          {num}
-        </button>
-      ))}
-
-      {paginas[paginas.length - 1] < totalPaginas && <span className="px-2">...</span>}
-      <button
-        onClick={() => setPaginaActual(paginaActual + 1)}
-        disabled={paginaActual === totalPaginas}
-        className="px-3 py-1 rounded bg-gray-200"
-      >
-        {">"}
-      </button>
-      <button
-        onClick={() => setPaginaActual(totalPaginas)}
-        disabled={paginaActual === totalPaginas}
-        className="px-3 py-1 rounded bg-gray-200"
-      >
-        {">>"}
-      </button>
-    </div>
-  );
-};
-
-  // LIMPIAR FILTROS
-
+  
   const limpiarFiltros = () => {
     setFiltroNombre("");
     setFiltroEstado("");
@@ -636,12 +598,15 @@ const importarExcel = async (file) => {
   const rolActual = localStorage.getItem("usuario_rol");
   const exportarDeshabilitado = rolActual === "RRHH";
   const rolDeshabilitado = rolActual !== "Administrador";
+
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold text-center mb-6">Gestión de Empleados</h2>
-      
+      <h2 className="text-2xl font-bold text-center mb-6">
+        Gestión de Empleados
+      </h2>
+
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-         <button
+        <button
           onClick={() => {
             if (mostrarFormulario) {
               resetNuevoEmpleado();
@@ -660,28 +625,26 @@ const importarExcel = async (file) => {
           {mostrarFormulario ? "Cancelar" : "Agregar empleado"}
         </button>
 
-
-
         <div className="flex gap-2 flex-wrap">
           {/* EXPORTAR */}
-            <button
-              onClick={exportarExcel}
-              disabled={exportarDeshabilitado || cargandoExport}
-              className={`px-4 py-2 rounded text-white ${
-                exportarDeshabilitado || cargandoExport
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-indigo-500 hover:bg-indigo-600"
-              }`}
-              title={
-                exportarDeshabilitado
-                  ? "Tu rol actual (RRHH) no permite exportar."
-                  : cargandoExport
-                  ? "Exportando…"
-                  : undefined
-              }
-            >
-              {cargandoExport ? "Exportando…" : "Exportar Excel"}
-            </button>
+          <button
+            onClick={exportarExcel}
+            disabled={exportarDeshabilitado || cargandoExport}
+            className={`px-4 py-2 rounded text-white ${
+              exportarDeshabilitado || cargandoExport
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-indigo-500 hover:bg-indigo-600"
+            }`}
+            title={
+              exportarDeshabilitado
+                ? "Tu rol actual (RRHH) no permite exportar."
+                : cargandoExport
+                ? "Exportando…"
+                : undefined
+            }
+          >
+            {cargandoExport ? "Exportando…" : "Exportar Excel"}
+          </button>
 
           {/* IMPORTAR */}
           <button
@@ -716,7 +679,6 @@ const importarExcel = async (file) => {
         </div>
       </div>
 
-  
       {/* FORMULARIO NUEVO EMPLEADO */}
       {mostrarFormulario && (
         <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6">
@@ -732,6 +694,7 @@ const importarExcel = async (file) => {
                 className="p-2 border rounded text-sm"
               />
             ))}
+
             {/* Estado */}
             <SelectInput
               name="id_estado"
@@ -762,7 +725,7 @@ const importarExcel = async (file) => {
               placeholder="Seleccione Rol..."
               disabled={rolDeshabilitado}
             />
-            {/*Área */}
+            {/* Área */}
             <SelectInput
               name="id_area"
               value={nuevoEmpleado.id_area}
@@ -770,7 +733,7 @@ const importarExcel = async (file) => {
               options={areas}
               placeholder="Seleccionar área..."
             />
-            {/*Puesto */}
+            {/* Puesto */}
             <input
               name="puesto"
               placeholder="Puesto"
@@ -781,12 +744,11 @@ const importarExcel = async (file) => {
             {/* Foto */}
             <FotoInput
               foto={nuevoEmpleado.foto}
-              setFoto={(foto) =>
-                setNuevoEmpleado({ ...nuevoEmpleado, foto })
-              }
+              setFoto={(foto) => setNuevoEmpleado({ ...nuevoEmpleado, foto })}
               showPreview={true}
             />
-            </div>
+          </div>
+
           {/* Botón guardar */}
           <div className="flex justify-center mt-4">
             <button
@@ -802,7 +764,6 @@ const importarExcel = async (file) => {
         </div>
       )}
 
-
       {/* FORMULARIO EDITAR EMPLEADO */}
       {empleadoEditando && (
         <div className="bg-yellow-100 p-4 rounded-lg shadow-md mb-6 flex flex-col md:flex-row gap-4">
@@ -814,7 +775,10 @@ const importarExcel = async (file) => {
               name="id_estado"
               value={empleadoEditando.id_estado}
               onChange={(e) =>
-                setEmpleadoEditando({ ...empleadoEditando, id_estado: e.target.value })
+                setEmpleadoEditando({
+                  ...empleadoEditando,
+                  id_estado: e.target.value,
+                })
               }
               options={estados}
               placeholder="Seleccionar estado..."
@@ -823,18 +787,21 @@ const importarExcel = async (file) => {
               name="id_clinica"
               value={empleadoEditando.id_clinica}
               onChange={(e) =>
-                setEmpleadoEditando({ ...empleadoEditando, id_clinica: e.target.value })
+                setEmpleadoEditando({
+                  ...empleadoEditando,
+                  id_clinica: e.target.value,
+                })
               }
               options={clinicas}
               placeholder="Seleccionar clínica..."
             />
-            <SelectInput 
+            <SelectInput
               name="id_rol"
               value={empleadoEditando.id_rol}
               onChange={(e) =>
                 setEmpleadoEditando({
-                 ...empleadoEditando,
-                 id_rol: e.target.value, 
+                  ...empleadoEditando,
+                  id_rol: e.target.value,
                 })
               }
               options={roles}
@@ -862,7 +829,10 @@ const importarExcel = async (file) => {
               placeholder="Dirección"
               value={empleadoEditando.direccion || ""}
               onChange={(e) =>
-                setEmpleadoEditando({ ...empleadoEditando, direccion: e.target.value })
+                setEmpleadoEditando({
+                  ...empleadoEditando,
+                  direccion: e.target.value,
+                })
               }
               className="p-2 border rounded text-sm"
             />
@@ -872,7 +842,8 @@ const importarExcel = async (file) => {
               onChange={(e) =>
                 setEmpleadoEditando({
                   ...empleadoEditando,
-                  id_area: e.target.value === "" ? null : Number(e.target.value),
+                  id_area:
+                    e.target.value === "" ? null : Number(e.target.value),
                 })
               }
               options={areas}
@@ -909,7 +880,7 @@ const importarExcel = async (file) => {
               </button>
             </div>
           </div>
-                  
+
           <div className="flex flex-col items-center">
             <p className="font-semibold mb-2">Foto actual</p>
             {empleadoEditando.foto ? (
@@ -917,7 +888,6 @@ const importarExcel = async (file) => {
                 src={`data:image/png;base64,${empleadoEditando.foto}`}
                 alt="Foto del empleado"
                 className="w-40 h-40 object-cover rounded-lg border shadow-md"
-                
               />
             ) : (
               <div className="w-40 h-40 flex items-center justify-center bg-gray-200 rounded-lg border">
@@ -925,24 +895,25 @@ const importarExcel = async (file) => {
               </div>
             )}
             <div className="mt-4">
-            <FotoInput
-              foto={empleadoEditando.foto}
-              setFoto={(nuevaFoto) =>
-                setEmpleadoEditando({
-                  ...empleadoEditando,
-                  foto: typeof nuevaFoto === "string" && nuevaFoto.trim() !== ""
+              <FotoInput
+                foto={empleadoEditando.foto}
+                setFoto={(nuevaFoto) =>
+                  setEmpleadoEditando({
+                    ...empleadoEditando,
+                    foto:
+                      typeof nuevaFoto === "string" &&
+                      nuevaFoto.trim() !== ""
                         ? nuevaFoto
-                        : empleadoEditando.foto ?? null
-                })
-              }
-              showPreview={false}
-            />
+                        : empleadoEditando.foto ?? null,
+                  })
+                }
+                showPreview={false}
+              />
             </div>
           </div>
-          </div>
-        )}
+        </div>
+      )}
 
-        
       {/* FILTROS */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <input
@@ -973,90 +944,79 @@ const importarExcel = async (file) => {
         </button>
       </div>
 
-    
       {/* TABLA */}
-        
+      <div className="w-full overflow-x-auto">
+        <table className="min-w-full border border-gray-300 text-left text-xs">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="px-1 py-1 border text-center">Nombre</th>
+              <th className="px-1 py-1 border text-center">DNI</th>
+              <th className="px-1 py-1 border text-center">Correo</th>
+              <th className="px-1 py-1 border text-center">Teléfono</th>
+              <th className="px-1 py-1 border text-center">Dirección</th>
+              <th className="px-1 py-1 border text-center">Estado</th>
+              <th className="px-1 py-1 border text-center">Clínica</th>
+              <th className="px-1 py-1 border text-center">Rol</th>
+              <th className="px-1 py-1 border text-center">Área</th>
+              <th className="px-1 py-1 border text-center">Puesto</th>
+              <th className="px-1 py-1 border text-center">Fecha ingreso</th>
+              <th className="px-1 py-1 border text-center">Fecha salida</th>
+              <th className="px-1 py-1 border text-center">Acciones</th>
+            </tr>
+          </thead>
 
-<div className="w-full overflow-x-auto">
-  <table className="min-w-full border border-gray-300 text-left text-xs">
-    <thead>
-      <tr className="bg-gray-200">
-        <th className="px-1 py-1 border text-center">Nombre</th>
-        <th className="px-1 py-1 border text-center">DNI</th>
-        <th className="px-1 py-1 border text-center">Correo</th>
-        <th className="px-1 py-1 border text-center">Teléfono</th>
-        <th className="px-1 py-1 border text-center">Dirección</th>
-        <th className="px-1 py-1 border text-center">Estado</th>
-        <th className="px-1 py-1 border text-center">Clínica</th>
-        <th className="px-1 py-1 border text-center">Rol</th>
-        <th className="px-1 py-1 border text-center">Área</th>
-        <th className="px-1 py-1 border text-center">Puesto</th>
-        <th className="px-1 py-1 border text-center">Fecha ingreso</th>
-        <th className="px-1 py-1 border text-center">Fecha salida</th>
-        <th className="px-1 py-1 border text-center">Acciones</th>
-      </tr>
-    </thead>
+            <tbody>
+              {empleadosActuales.map((emp) => (
+                <tr key={emp.id_empleado} className="hover:bg-blue-50">
+                  <td className="px-1 py-1 border max-w-[220px] whitespace-normal break-words">
+                    {emp.nombre}
+                  </td>
+                  <td className="px-1 py-1 border">{formatDNI(emp.DNI)}</td>
+                  <td className="px-1 py-1 border max-w-[160px] truncate" title={emp.correo}>
+                    {emp.correo}
+                  </td>
+                  <td className="px-1 py-1 border">{emp.telefono}</td>
+                  <td className="px-1 py-1 border max-w-[260px] clamp-2">{emp.direccion}</td>
+                  <td className="px-1 py-1 border">{emp.estado}</td>
+                  <td className="px-1 py-1 border max-w-[160px] whitespace-normal break-words">
+                    {emp.clinica}
+                  </td>
+                  <td className="px-1 py-1 border">{emp.rol}</td>
+                  <td className="px-1 py-1 border max-w-[160px] whitespace-normal break-words">
+                    {emp.nombre_area ?? emp.area ?? "—"}
+                  </td>
+                  <td className="px-1 py-1 border max-w-[140px] truncate" title={emp.puesto ?? "—"}>
+                    {emp.puesto ?? "—"}
+                  </td>
+                  <td className="px-1 py-1 border">{formatFecha(emp.fecha_ingreso)}</td>
+                  <td className="px-1 py-1 border">{formatFecha(emp.fecha_salida)}</td>
+                  <td className="px-1 py-1 border flex gap-1 whitespace-nowrap">
+                    <button
+                      onClick={() => seleccionarEmpleado(emp.id_empleado)}
+                      className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => eliminarEmpleado(emp.id_empleado)}
+                      className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))}
 
-    <tbody>
-      {empleadosActuales.map((emp) => (
-        <tr key={emp.id_empleado} className="hover:bg-blue-50">
-          <td className="px-1 py-1 border max-w-[220px] whitespace-normal break-words">
-            {emp.nombre}
-          </td>
-
-          <td className="px-1 py-1 border">{formatDNI(emp.DNI)}</td>
-          <td className="px-1 py-1 border max-w-[160px] truncate" title={emp.correo}>
-            {emp.correo}
-          </td>
-
-          <td className="px-1 py-1 border">{emp.telefono}</td>
-          <td className="px-1 py-1 border max-w-[260px] clamp-2">
-            {emp.direccion}
-          </td>
-
-          <td className="px-1 py-1 border">{emp.estado}</td>
-          <td className="px-1 py-1 border max-w-[160px] whitespace-normal break-words">
-            {emp.clinica}
-          </td>
-
-          <td className="px-1 py-1 border">{emp.rol}</td>
-          <td className="px-1 py-1 border max-w-[160px] whitespace-normal break-words">
-            {emp.nombre_area ?? emp.area ?? "—"}
-          </td>
-          <td className="px-1 py-1 border max-w-[140px] truncate" title={emp.puesto ?? "—"}>
-            {emp.puesto ?? "—"}
-          </td>
-
-          <td className="px-1 py-1 border">{formatFecha(emp.fecha_ingreso)}</td>
-          <td className="px-1 py-1 border">{formatFecha(emp.fecha_salida)}</td>
-
-          <td className="px-1 py-1 border flex gap-1 whitespace-nowrap">
-            <button
-              onClick={() => seleccionarEmpleado(emp.id_empleado)}
-              className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
-            >
-              Editar
-            </button>
-            <button
-              onClick={() => eliminarEmpleado(emp.id_empleado)}
-              className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
-            >
-              Eliminar
-            </button>
-          </td>
-        </tr>
-      ))}
-
-      {empleadosActuales.length === 0 && (
-        <tr>
-          <td colSpan={13} className="text-center p-4 text-gray-500">
-            No se encontraron empleados.
-          </td>
-        </tr>
-      )}
-    </tbody>
-  </table>
-</div>
+              {empleadosActuales.length === 0 && (
+                <tr>
+                  <td colSpan={13} className="text-center p-4 text-gray-500">
+                    No se encontraron empleados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+        </table>
+      </div>
 
       {/* PAGINACION */}
       <Paginacion

@@ -1,0 +1,1 @@
+export const API_BASE = "https://<tu-app>.azurewebsites.net/api";

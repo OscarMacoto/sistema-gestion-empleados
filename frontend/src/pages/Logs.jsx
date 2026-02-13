@@ -1,5 +1,11 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { API_BASE } from "../config/api";
+
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: { Accept: "application/json" },
+});
 
 const Logs = () => {
   const [logs, setLogs] = useState([]);
@@ -7,7 +13,7 @@ const Logs = () => {
   const [hasta, setHasta] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(100);
-  const [pagination, setPagination] = useState(null); 
+  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -32,7 +38,7 @@ const Logs = () => {
     setLoading(true);
     setError("");
     try {
-      const { data } = await axios.get("http://localhost:5000/api/logs", {
+      const { data } = await api.get("/logs", {
         params: {
           desde,
           hasta,
@@ -40,7 +46,12 @@ const Logs = () => {
           limit: _limit,
         },
       });
-      const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+
+      const rows = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
 
       setLogs(rows);
       setPagination(Array.isArray(data) ? null : data?.pagination ?? null);
@@ -55,9 +66,7 @@ const Logs = () => {
     } catch (err) {
       console.error("Error al obtener logs:", err);
       setError(
-        err?.response?.data?.error ??
-        err?.message ??
-        "Error al obtener logs"
+        err?.response?.data?.error ?? err?.message ?? "Error al obtener logs"
       );
       setLogs([]);
       setPagination(null);
@@ -68,9 +77,10 @@ const Logs = () => {
 
   const exportarLogs = () => {
     if (!validarFechas()) return;
-    const url = new URL("http://localhost:5000/api/logs/exportar");
+    const url = new URL(`${API_BASE}/logs/exportar`);
     url.searchParams.set("desde", desde);
     url.searchParams.set("hasta", hasta);
+
     window.open(url.toString(), "_blank");
   };
 
@@ -87,7 +97,7 @@ const Logs = () => {
     }
   };
 
-  const rows = Array.isArray(logs) ? logs : []; 
+  const rows = Array.isArray(logs) ? logs : [];
 
   return (
     <div className="p-4">
@@ -115,6 +125,7 @@ const Logs = () => {
         </label>
 
         <button
+          type="button"
           onClick={() => {
             setPage(1);
             obtenerLogs({ page: 1, limit });
@@ -125,14 +136,17 @@ const Logs = () => {
         </button>
 
         <button
+          type="button"
           onClick={exportarLogs}
           className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
         >
           Exportar Excel
         </button>
+
         {pagination && (
           <div className="ml-auto flex items-center gap-2">
             <button
+              type="button"
               onClick={() => {
                 if (page > 1) {
                   const next = page - 1;
@@ -149,6 +163,7 @@ const Logs = () => {
               Página {pagination.page} de {pagination.totalPages}
             </span>
             <button
+              type="button"
               onClick={() => {
                 if (pagination && page < pagination.totalPages) {
                   const next = page + 1;

@@ -1,5 +1,18 @@
 import { useMsal } from "@azure/msal-react";
 import { useEffect, useState } from "react";
+import { API_BASE } from "../config/api";
+
+async function apiGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET ${path} → ${res.status} ${res.statusText} ${text}`);
+  }
+  return res.json();
+}
 
 function SelfService() {
   const { accounts } = useMsal();
@@ -7,26 +20,27 @@ function SelfService() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (accounts.length > 0) {
-      const userEmail = accounts[0].username;
+    const cargarPerfil = async () => {
+      if (accounts.length === 0) {
+        setUserData({ error: "No hay sesión activa." });
+        setLoading(false);
+        return;
+      }
 
-      fetch(`http://localhost:5000/api/empleados/mi-perfil/${userEmail}`)
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(`Error HTTP: ${res.status}`);
-          }
-          return res.json();
-        })
-        .then((data) => {
-          setUserData(data.data);
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error("Error al obtener datos del usuario:", err);
-          setUserData({ error: "No se pudo cargar la información." });
-          setLoading(false);
-        });
-    }
+      try {
+        const userEmail = accounts[0].username;
+        const data = await apiGet(`/empleados/mi-perfil/${encodeURIComponent(userEmail)}`);
+
+        setUserData(data?.data ?? data ?? {});
+      } catch (err) {
+        console.error("Error al obtener datos del usuario:", err);
+        setUserData({ error: "No se pudo cargar la información." });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarPerfil();
   }, [accounts]);
 
   if (loading) {
@@ -61,7 +75,9 @@ function SelfService() {
         <p><strong>Puesto:</strong> {mostrar(userData.puesto)}</p>
         <p>
           <strong>Fecha de ingreso:</strong>{" "}
-          {userData.fecha_ingreso ? new Date(userData.fecha_ingreso).toLocaleDateString() : "No registrada"}
+          {userData.fecha_ingreso
+            ? new Date(userData.fecha_ingreso).toLocaleDateString()
+            : "No registrada"}
         </p>
       </div>
     </div>

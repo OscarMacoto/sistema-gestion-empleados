@@ -1,4 +1,42 @@
 import { useEffect, useState } from "react";
+import { API_BASE } from "../config/api";
+
+async function apiGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET ${path} → ${res.status} ${res.statusText} ${text}`);
+  }
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let payload;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = { error: await res.text().catch(() => "Error desconocido") };
+    }
+    const message = payload?.error || payload?.message || "Error en la solicitud";
+    const e = new Error(message);
+    e.status = res.status;
+    throw e;
+  }
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
 
 function Clinicas() {
   const [clinicas, setClinicas] = useState([]);
@@ -8,6 +46,8 @@ function Clinicas() {
 
   const [nuevaClinica, setNuevaClinica] = useState({ nombre_clinica: "" });
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [cargando, setCargando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     cargarClinicas();
@@ -15,64 +55,56 @@ function Clinicas() {
 
   useEffect(() => {
     setPagina(1);
-  }, [busqueda])
+  }, [busqueda]);
 
-  
-const cargarClinicas = () => {
-  fetch("http://localhost:5000/api/clinicas")
-    .then(res => res.json())
-    .then(data => {
-      setClinicas(data);
+  const cargarClinicas = async () => {
+    try {
+      setCargando(true);
+      const data = await apiGet("/clinicas");
+      setClinicas(Array.isArray(data) ? data : []);
       setPagina(1);
-    })
-    .catch(() => console.error("No se pudieron cargar las clínicas"));
-};
-
+    } catch (err) {
+      console.error("No se pudieron cargar las clínicas:", err);
+      alert("No se pudieron cargar las clínicas");
+    } finally {
+      setCargando(false);
+    }
+  };
 
   const handleChangeClinica = (e) => {
     setNuevaClinica({ ...nuevaClinica, [e.target.name]: e.target.value });
   };
 
-  
-const [guardando, setGuardando] = useState(false);
+  const agregarClinica = async () => {
+    try {
+      if (!nuevaClinica.nombre_clinica?.trim()) return;
+      setGuardando(true);
 
-const agregarClinica = async () => {
-  try {
-    setGuardando(true);
-    const response = await fetch("http://localhost:5000/api/clinicas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(nuevaClinica),
-    });
+      await apiPost("/clinicas", nuevaClinica);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      alert(errorData.error || "Error al agregar clínica");
-      return;
+      alert("Clínica agregada correctamente");
+      setNuevaClinica({ nombre_clinica: "" });
+      setMostrarFormulario(false);
+      await cargarClinicas();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Error al agregar clínica");
+    } finally {
+      setGuardando(false);
     }
-
-    alert("Clínica agregada correctamente");
-    setNuevaClinica({ nombre_clinica: "" });
-    setMostrarFormulario(false);
-    cargarClinicas();
-  } catch (error) {
-    alert("Error al agregar clínica");
-    console.error(error);
-  } finally {
-    setGuardando(false);
-  }
-};
-
+  };
 
   const filtrados = Array.isArray(clinicas)
-    ? clinicas.filter(c =>
+    ? clinicas.filter((c) =>
         c.nombre_clinica?.toLowerCase().includes(busqueda.toLowerCase())
       )
     : [];
 
-  const totalPaginas = Math.ceil(filtrados.length / porPagina);
-  const inicio = (pagina - 1) * porPagina;
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
+  const paginaAjustada = Math.min(pagina, totalPaginas);
+  const inicio = (paginaAjustada - 1) * porPagina;
   const fin = inicio + porPagina;
+
   const rolActual = localStorage.getItem("usuario_rol");
   const agregarClinicaDeshabilitado = rolActual !== "Administrador";
 
@@ -85,16 +117,21 @@ const agregarClinica = async () => {
           type="text"
           placeholder="Buscar clínica..."
           value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
+          onChange={(e) => setBusqueda(e.target.value)}
           className="border p-2 w-full rounded-lg mr-4"
         />
         <button
-          onClick={() => !agregarClinicaDeshabilitado && setMostrarFormulario(!mostrarFormulario)}
+          type="button"
+          onClick={() =>
+            !agregarClinicaDeshabilitado &&
+            setMostrarFormulario(!mostrarFormulario)
+          }
           disabled={agregarClinicaDeshabilitado}
           className={`px-4 py-2 rounded text-white 
-            ${agregarClinicaDeshabilitado
-              ? "bg-gray-400 cursor-not-allowed"
-              : mostrarFormulario
+            ${
+              agregarClinicaDeshabilitado
+                ? "bg-gray-400 cursor-not-allowed"
+                : mostrarFormulario
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-green-600 hover:bg-green-700"
             }`}
@@ -114,52 +151,75 @@ const agregarClinica = async () => {
             className="p-2 border rounded w-full mb-4"
           />
           <button
+            type="button"
             onClick={agregarClinica}
             disabled={guardando || !nuevaClinica.nombre_clinica.trim()}
             className={`px-4 py-2 rounded text-white 
-                ${guardando ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}
+                ${
+                  guardando
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }
               `}
-            >
-          {guardando ? "Guardando..." : "Guardar clínica"}
+          >
+            {guardando ? "Guardando..." : "Guardar clínica"}
           </button>
         </div>
       )}
 
-      <table className="min-w-full border border-gray-300 rounded-lg text-center">
-        <thead className="bg-gray-300 text-black">
-          <tr>
-            <th className="py-2 px-4">ID</th>
-            <th className="py-2 px-4">Nombre Clínica</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtrados.slice(inicio, fin).map(c => (
-            <tr key={c.id_clinica} className="border-b hover:bg-blue-100">
-              <td className="py-2">{c.id_clinica}</td>
-              <td className="py-2">{c.nombre_clinica}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="min-h-[120px]">
+        {cargando ? (
+          <div className="text-center text-gray-500">Cargando clínicas…</div>
+        ) : (
+          <>
+            <table className="min-w-full border border-gray-300 rounded-lg text-center">
+              <thead className="bg-gray-300 text-black">
+                <tr>
+                  <th className="py-2 px-4">ID</th>
+                  <th className="py-2 px-4">Nombre Clínica</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.slice(inicio, fin).map((c) => (
+                  <tr key={c.id_clinica} className="border-b hover:bg-blue-100">
+                    <td className="py-2">{c.id_clinica}</td>
+                    <td className="py-2">{c.nombre_clinica}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-      <div className="flex justify-center items-center mt-4 gap-2">
-        <button
-          onClick={() => setPagina(pagina - 1)}
-          disabled={pagina === 1}
-          className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50"
-        >
-          ⬅️
-        </button>
-        <span>
-          Página {pagina} de {totalPaginas}
-        </span>
-        <button
-          onClick={() => setPagina(pagina + 1)}
-          disabled={pagina === totalPaginas}
-          className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50"
-        >
-          ➡️
-        </button>
+            {filtrados.length === 0 && (
+              <div className="text-center text-gray-500 mt-4">
+                No hay resultados.
+              </div>
+            )}
+
+            <div className="flex justify-center items-center mt-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                disabled={paginaAjustada === 1}
+                className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50"
+              >
+                ⬅️
+              </button>
+              <span>
+                Página {paginaAjustada} de {totalPaginas}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setPagina((p) => Math.min(totalPaginas, p + 1))
+                }
+                disabled={paginaAjustada === totalPaginas}
+                className="px-4 py-2 bg-gray-200 rounded-lg disabled:opacity-50"
+              >
+                ➡️
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
